@@ -1,0 +1,1 @@
+Programs named "_P" are copies of two-period code before simplifying for the two-period model. That is, the two period model does not include labor or option for discrete choice terminal period. These bits of code are maintained here for later usage in multi-period model if needed.
