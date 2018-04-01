@@ -71,3 +71,8 @@ last_params = [3.06048583984375, 2.096923828125, 0.7017840576171874, 0.672271728
 
 @elapsed test_smm_obj_par = smm_obj_testing(nlsy79data_formatted, last_params, paramsprefs, paramsdec, paramsshock,
   par_flag=1, par_N=4)
+
+#= Investigate Parameter Vector That Didn't Converge In Bellman =#
+
+trouble_params = [9.16504, 3.63672, 0.982822, 0.104922, 1.64746, 1.97168, 1.70801, 1.4541, 1.31348, 1.13184,
+  1.74707, 1.75684, 1.71191, 1.44629, 1.30371, 0.0360991, -0.847656, 0.572337, 0.961918, -1.12109]

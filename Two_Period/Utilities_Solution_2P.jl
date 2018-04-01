@@ -341,6 +341,7 @@ function bellman_optim_child!(y::Float64, a::Float64, b::Float64,
   #  error_return_state = Any[]
   # end
 
-  return -1*opt_agent.minimum, opt_agent.minimizer, opt_agent.g_converged, opt_agent.iterations, error_return_state
+  # return -1*opt_agent.minimum, opt_agent.minimizer, opt_agent.g_converged, opt_agent.iterations, error_return_state
+  return -1*opt_agent.minimum, opt_agent.minimizer, opt_agent.g_converged, opt_agent.iterations
 
 end
