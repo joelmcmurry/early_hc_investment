@@ -12,17 +12,16 @@ mutable struct ParametersPrefs
   B_hi :: Float64 ## high future valuation
   B_lo :: Float64 ## low future valuation
   alphaT1_hi :: Float64 ##  high weight on assets
-  alphaT1_mid :: Float64 ## mid weight on assets
   alphaT1_lo :: Float64 ## low weight on assets
 
-  gamma_y :: Array{Float64} ## type probability parameter vector for income (FIRST MEMBER Is NORMALIZED to 1)
+  gamma_y :: Array{Float64} ## type probability parameter vector for income (FIRST PARAMETER IS LOCKED DOWN AT 1)
   gamma_a :: Array{Float64} ## type probability parameter vector for assets
   gamma_b :: Array{Float64} ## type probability parameter vector for hc
 
-  function ParametersPrefs(;B_hi=5., B_lo=1., alphaT1_hi=0.75, alphaT1_mid=0.5, alphaT1_lo=0.25,
-    gamma_y=[1., 1., 1., 1., 1., 1.], gamma_a=[1., 1., 1., 1., 1., 1.], gamma_b=[1., 1., 1., 1., 1., 1.])
+  function ParametersPrefs(;B_hi=5., B_lo=1., alphaT1_hi=0.75, alphaT1_lo=0.25,
+    gamma_y=[1., 1., 1., 1.], gamma_a=[1., 1., 1., 1.], gamma_b=[1., 1., 1., 1.])
 
-    new(B_hi, B_lo, alphaT1_hi, alphaT1_mid, alphaT1_lo, gamma_y, gamma_a, gamma_b)
+    new(B_hi, B_lo, alphaT1_hi, alphaT1_lo, gamma_y, gamma_a, gamma_b)
 
   end
 
@@ -30,23 +29,19 @@ end
 
 # create types given preference parameters
 
-function type_construct(B_hi::Float64, B_lo::Float64, alphaT1_hi::Float64, alphaT1_mid::Float64, alphaT1_lo::Float64)
+function type_construct(B_hi::Float64, B_lo::Float64, alphaT1_hi::Float64, alphaT1_lo::Float64)
 
   # construct vector of types from preferences
   type1 = [B_hi; alphaT1_hi]
-  type2 = [B_hi; alphaT1_mid]
-  type3 = [B_hi; alphaT1_lo]
-  type4 = [B_lo; alphaT1_hi]
-  type5 = [B_lo; alphaT1_mid]
-  type6 = [B_lo; alphaT1_lo]
+  type2 = [B_hi; alphaT1_lo]
+  type3 = [B_lo; alphaT1_hi]
+  type4 = [B_lo; alphaT1_lo]
 
-  type_vec = Array{Array}(6)
+  type_vec = Array{Array}(4)
   type_vec[1] = type1
   type_vec[2] = type2
   type_vec[3] = type3
   type_vec[4] = type4
-  type_vec[5] = type5
-  type_vec[6] = type6
 
   return type_vec
 
@@ -88,19 +83,15 @@ function type_prob(y0::Float64, a0::Float64, b0::Float64, paramsprefs::Parameter
   numerator2 = type_prob_numerator(2, y0, a0, b0, paramsprefs)
   numerator3 = type_prob_numerator(3, y0, a0, b0, paramsprefs)
   numerator4 = type_prob_numerator(4, y0, a0, b0, paramsprefs)
-  numerator5 = type_prob_numerator(5, y0, a0, b0, paramsprefs)
-  numerator6 = type_prob_numerator(6, y0, a0, b0, paramsprefs)
 
-  denominator = numerator1 + numerator2 + numerator3 + numerator4 + numerator5 + numerator6
+  denominator = numerator1 + numerator2 + numerator3 + numerator4
 
   prob1 = numerator1/denominator
   prob2 = numerator2/denominator
   prob3 = numerator3/denominator
   prob4 = numerator4/denominator
-  prob5 = numerator5/denominator
-  prob6 = numerator6/denominator
 
-  return prob1, prob2, prob3, prob4, prob5, prob6
+  return prob1, prob2, prob3, prob4
 
 end
 
@@ -378,7 +369,9 @@ function moment_gen_dist(formatted_data; restrict_flag=1)
     uncond_moment_stack  = vcat(uncond_moment_stack, b_moments[i])
     uncond_moment_stack  = vcat(uncond_moment_stack, savings_moments[i])
     uncond_moment_stack  = vcat(uncond_moment_stack, x_moments[i])
+  end
 
+  for i in 1:2
     uncond_moment_stack = vcat(uncond_moment_stack, y_cov[i])
     uncond_moment_stack = vcat(uncond_moment_stack, a_cov[i])
     uncond_moment_stack  = vcat(uncond_moment_stack, b_cov[i])
@@ -441,11 +434,20 @@ function moment_gen_dist(formatted_data; restrict_flag=1)
   cond_moment_stack = 0
   for i in 1:4
     cond_moment_stack = vcat(cond_moment_stack, savings_cond_y[i])
+  end
+  for i in 1:4
     cond_moment_stack = vcat(cond_moment_stack, savings_cond_a[i])
+  end
+  for i in 1:4
     cond_moment_stack = vcat(cond_moment_stack, savings_cond_b[i])
-
+  end
+  for i in 1:4
     cond_moment_stack = vcat(cond_moment_stack, x_cond_y[i])
+  end
+  for i in 1:4
     cond_moment_stack = vcat(cond_moment_stack, x_cond_a[i])
+  end
+  for i in 1:4
     cond_moment_stack = vcat(cond_moment_stack, x_cond_b[i])
   end
 
@@ -463,14 +465,12 @@ function moment_gen_dist(formatted_data; restrict_flag=1)
     "Cov[savings,y]", "Cov[savings,a]", "Cov[savings,b]",
     "Cov[x,y]", "Cov[x,a]", "Cov[x,b]",
     "Cov[s,x]",
-    "E[savings|1st quant. y]", "E[savings|1st quant. a]", "E[savings|1st quant. b]",
-    "E[x|1st quant. y]", "E[x|1st quant. a]", "E[x|1st quant. b]",
-    "E[savings|2nd quant. y]", "E[savings|2nd quant. a]", "E[savings|2nd quant. b]",
-    "E[x|2nd quant. y]", "E[x|2nd quant. a]", "E[x|2nd quant. b]",
-    "E[savings|3rd quant. y]", "E[savings|3rd quant. a]", "E[savings|3rd quant. b]",
-    "E[x|3rd quant. y]", "E[x|3rd quant. a]", "E[x|3rd quant. b]",
-    "E[savings|4th quant. y]", "E[savings|4th quant. a]", "E[savings|4th quant. b]",
-    "E[x|4th quant. y]", "E[x|4th quant. a]", "E[x|4th quant. b]"]
+    "E[savings|1st quant. y]","E[savings|2nd quant. y]","E[savings|3rd quant. y]","E[savings|4th quant. y]",
+    "E[savings|1st quant. a]","E[savings|2nd quant. a]","E[savings|3rd quant. a]","E[savings|4th quant. a]",
+    "E[savings|1st quant. b]","E[savings|2nd quant. b]","E[savings|3rd quant. b]","E[savings|4th quant. b]",
+    "E[x|1st quant. y]","E[x|2nd quant. y]","E[x|3rd quant. y]","E[x|4th quant. y]",
+    "E[x|1st quant. a]","E[x|2nd quant. a]","E[x|3rd quant. a]","E[x|4th quant. a]",
+    "E[x|1st quant. b]","E[x|2nd quant. b]","E[x|3rd quant. b]","E[x|4th quant. b]"]
 
   # moment restriction
   # moment_restrict = [2, 3, 4, 5, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25,
