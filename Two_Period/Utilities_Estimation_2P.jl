@@ -234,7 +234,7 @@ end
 function smm_sobol(data_formatted, paramsprefs::ParametersPrefs, paramsdec::ParametersDec, paramsshock::ParametersShock;
    sobol_N=10,
    B_hi_lb=1., B_hi_ub=10., B_lo_lb=1., B_lo_ub=5.,
-   alphaT1_hi_lb=0.5, alphaT1_hi_ub=0.99 alphaT1_lo_lb=0.01, alphaT1_lo_ub=0.25,
+   alphaT1_hi_lb=0.5, alphaT1_hi_ub=0.99, alphaT1_lo_lb=0.01, alphaT1_lo_ub=0.25,
    gamma_y2_lb=1., gamma_y2_ub=2., gamma_y3_lb=1., gamma_y3_ub=2., gamma_y4_lb=1., gamma_y4_ub=2.,
    gamma_a1_lb=1., gamma_a1_ub=2., gamma_a2_lb=1., gamma_a2_ub=2., gamma_a3_lb=1., gamma_a3_ub=2., gamma_a4_lb=1., gamma_a4_ub=2.,
    gamma_b1_lb=1., gamma_b1_ub=2., gamma_b2_lb=1., gamma_b2_ub=2., gamma_b3_lb=1., gamma_b3_ub=2., gamma_b4_lb=1., gamma_b4_ub=2.,
@@ -337,7 +337,7 @@ end
 function smm_sobol_write_results(path, data_formatted, paramsprefs::ParametersPrefs, paramsdec::ParametersDec, paramsshock::ParametersShock;
    sobol_N=10,
    B_hi_lb=1., B_hi_ub=10., B_lo_lb=1., B_lo_ub=5.,
-   alphaT1_hi_lb=0.5, alphaT1_hi_ub=0.99 alphaT1_lo_lb=0.01, alphaT1_lo_ub=0.25,
+   alphaT1_hi_lb=0.5, alphaT1_hi_ub=0.99, alphaT1_lo_lb=0.01, alphaT1_lo_ub=0.25,
    gamma_y2_lb=1., gamma_y2_ub=2., gamma_y3_lb=1., gamma_y3_ub=2., gamma_y4_lb=1., gamma_y4_ub=2.,
    gamma_a1_lb=1., gamma_a1_ub=2., gamma_a2_lb=1., gamma_a2_ub=2., gamma_a3_lb=1., gamma_a3_ub=2., gamma_a4_lb=1., gamma_a4_ub=2.,
    gamma_b1_lb=1., gamma_b1_ub=2., gamma_b2_lb=1., gamma_b2_ub=2., gamma_b3_lb=1., gamma_b3_ub=2., gamma_b4_lb=1., gamma_b4_ub=2.,

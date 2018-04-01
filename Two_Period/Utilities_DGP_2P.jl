@@ -182,7 +182,7 @@ function sim_choices(initial_states::Array{Float64}, shocks_y::Array{Float64}, s
   paramsprefs::ParametersPrefs, paramsdec::ParametersDec, paramsshock::ParametersShock)
 
   # construct types given preferences
-  type_vec = type_construct(paramsprefs.B_hi, paramsprefs.B_lo, paramsprefs.alphaT1_hi, paramsprefs.alphaT1_mid, paramsprefs.alphaT1_lo)
+  type_vec = type_construct(paramsprefs.B_hi, paramsprefs.B_lo, paramsprefs.alphaT1_hi, paramsprefs.alphaT1_lo)
 
   # extract N, T, and S from initial states and shock paths
   N = length(initial_states[:,1])
@@ -224,7 +224,7 @@ function sim_choices(initial_states::Array{Float64}, shocks_y::Array{Float64}, s
     # initialize choices for endogenous starting values within HH (across types)
     choices0_type = zeros(2)
 
-    for type_index in 1:6
+    for type_index in 1:4
 
       # store choices and states for HH and type
       choices_savings_n_type = zeros(S)
