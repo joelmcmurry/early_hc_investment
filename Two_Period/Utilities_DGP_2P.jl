@@ -15,7 +15,7 @@ mutable struct ParametersPrefs
   alphaT1_mid :: Float64 ## mid weight on assets
   alphaT1_lo :: Float64 ## low weight on assets
 
-  gamma_y :: Array{Float64} ## type probability parameter vector for income
+  gamma_y :: Array{Float64} ## type probability parameter vector for income (FIRST MEMBER Is NORMALIZED to 1)
   gamma_a :: Array{Float64} ## type probability parameter vector for assets
   gamma_b :: Array{Float64} ## type probability parameter vector for hc
 
