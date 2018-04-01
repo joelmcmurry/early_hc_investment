@@ -16,7 +16,7 @@ nlsy79data = readtable("/home/m/mcmurry2/two_period_states_controls_for_est.csv"
 
 # transform data to form readable by moment generation function
 
-nlsy79data_formatted = data_transform(nlsy79data)
+@everywhere nlsy79data_formatted = data_transform(nlsy79data)
 
 ## Initialize Parameters
 

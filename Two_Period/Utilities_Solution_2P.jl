@@ -29,11 +29,11 @@ mutable struct ParametersDec
 
   rho_y :: Float64 ## income persistence parameter
 
-  function ParametersDec(;beta=0.5, r=0.06, B=1.,
+  function ParametersDec(;beta=0.5, r=0.18, B=1.,
     alphaT1=0.5, alphaT2=1-alphaT1,
     iota0=1.87428633, iota1=0.42122805,
     iota2=0.05979631, iota3=0.0,
-    beta0=4.35, beta1=-0.003, beta2=0.0037, rho_y=0.997)
+    beta0=4.134, beta1=0.03, beta2=0.003, rho_y=0.997)
 
     new(beta, r, B, alphaT1, alphaT2, iota0, iota1, iota2, iota3, beta0, beta1, beta2, rho_y)
 
@@ -216,7 +216,10 @@ function Y_evol(y::Float64, rho_y::Float64, shock::Float64)
 
   yprime = exp(lnyprime)
 
-  return yprime
+  # adjust for yearly (from six-year value)
+  yprime_yearly = yprime/6.
+
+  return yprime_yearly
 
 end
 
@@ -243,6 +246,9 @@ end
 
 function t_opt(y::Float64, a::Float64, b::Float64,
   alphaT1::Float64, alphaT2::Float64, beta0::Float64, beta1::Float64, beta2::Float64, r::Float64)
+
+  # annualize r
+  r_annual = r/6.
 
   pv_scale = dot(ones(4),(1/(1+r)).^[1.0 2.0 3.0 4.0])
   y_pv = dot(y*ones(4),(1/(1+r)).^[1.0 2.0 3.0 4.0])

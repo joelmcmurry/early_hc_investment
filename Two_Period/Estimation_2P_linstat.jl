@@ -24,7 +24,7 @@ paramsdec = ParametersDec()
 paramsprefs = ParametersPrefs()
 paramsshock = ParametersShock()
 
-param_guess = [0.31 0.76 0.10 0.07 0.16 0.04 1.8 0.19 0.14 0.03]
+# param_guess = [0.31 0.76 0.10 0.07 0.16 0.04 1.8 0.19 0.14 0.03]
 
 ## Carry Out SMM Estimation and Write to Output File
 
