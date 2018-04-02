@@ -202,7 +202,7 @@ end
 function HC_prod(b::Float64, x::Float64, shock::Float64,
   iota0::Float64, iota1::Float64, iota2::Float64, iota3::Float64)
 
-  bprime = exp(iota0 + iota1*log(b) + iota2*log(x) + iota3*log(b)*log(x))*exp(shock)
+  bprime = max(exp(iota0 + iota1*log(b) + iota2*log(x) + iota3*log(b)*log(x))*exp(shock), 1.)
 
   return bprime
 
@@ -232,11 +232,14 @@ end
 function u_T(y::Float64, a::Float64, b::Float64, alphaT1::Float64, alphaT2::Float64,
     beta0::Float64, beta1::Float64, beta2::Float64, tuition::Float64, r::Float64)
 
+    # annualize r
+    r_annual = r/6.
+
     # present value of income
-    y_pv = dot(y*ones(4),(1/(1+r)).^[1.0 2.0 3.0 4.0])
+    y_pv = dot(y*ones(4),(1/(1+r_annual)).^[1.0 2.0 3.0 4.0])
 
     # present value of tuition
-    t_pv = dot(tuition*ones(4),(1/(1+r)).^[1.0 2.0 3.0 4.0])
+    t_pv = dot(tuition*ones(4),(1/(1+r_annual)).^[1.0 2.0 3.0 4.0])
 
     utility = alphaT1*log(y_pv + a - t_pv) + alphaT2*(beta0 + beta1*log(tuition) + beta2*log(tuition)*log(b))
 
@@ -250,8 +253,8 @@ function t_opt(y::Float64, a::Float64, b::Float64,
   # annualize r
   r_annual = r/6.
 
-  pv_scale = dot(ones(4),(1/(1+r)).^[1.0 2.0 3.0 4.0])
-  y_pv = dot(y*ones(4),(1/(1+r)).^[1.0 2.0 3.0 4.0])
+  pv_scale = dot(ones(4),(1/(1+r_annual)).^[1.0 2.0 3.0 4.0])
+  y_pv = dot(y*ones(4),(1/(1+r_annual)).^[1.0 2.0 3.0 4.0])
 
   t_star = alphaT2*(beta1+beta2*log(b))*(y_pv + a)/
         (pv_scale*(alphaT1 + alphaT2*(beta1+beta2*log(b))))
