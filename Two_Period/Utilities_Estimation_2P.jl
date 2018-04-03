@@ -404,10 +404,10 @@ function smm_obj(initial_state_data, target_moments, W::Array, param_vec::Array,
   else
     # simulate dataset and compute moments, whether serial or parallel
     if par_flag == 0
-       sim_moments = dgp_moments(initial_state_data, paramsprefs, paramsdec, paramsshock,
+       sim_moments, error_log = dgp_moments(initial_state_data, paramsprefs, paramsdec, paramsshock,
          T=T, seed=seed, S=S, N=N, sample_code=sample_code, restrict_flag=restrict_flag, error_log_flag=error_log_flag)
    elseif par_flag == 1
-      sim_moments = dgp_moments_par(initial_state_data, paramsprefs, paramsdec, paramsshock,
+      sim_moments, error_log = dgp_moments_par(initial_state_data, paramsprefs, paramsdec, paramsshock,
         T=T, seed=seed, S=S, N=N, sample_code=sample_code, restrict_flag=restrict_flag, par_N=par_N, error_log_flag=error_log_flag)
    else
       throw(error("par_flag must be 0 or 1"))
@@ -469,10 +469,10 @@ function smm_obj_testing(data_formatted, param_vec::Array,
   else
      # simulate dataset and compute moments, whether serial or parallel
       if par_flag == 0
-         sim_moments = dgp_moments(data_formatted, paramsprefs_float, paramsdec_float, paramsshock_float,
+         sim_moments, error_log = dgp_moments(data_formatted, paramsprefs_float, paramsdec_float, paramsshock_float,
          T=T, seed=seed, S=S, N=N, sample_code=sample_code, restrict_flag=restrict_flag, error_log_flag=error_log_flag)
       elseif par_flag == 1
-         sim_moments = dgp_moments_par(data_formatted, paramsprefs_float, paramsdec_float, paramsshock_float,
+         sim_moments, error_log = dgp_moments_par(data_formatted, paramsprefs_float, paramsdec_float, paramsshock_float,
          T=T, seed=seed, S=S, N=N, sample_code=sample_code, restrict_flag=restrict_flag, par_N=par_N, error_log_flag=error_log_flag)
       else
          throw(error("par_flag must be 0 or 1"))
@@ -511,126 +511,249 @@ function smm_obj_testing(data_formatted, param_vec::Array,
   #   tabular(table_calibrated)
   # end
 
-  return obj, max_error_index[1], data_moments, sim_moments
+  return obj, max_error_index[1], data_moments, sim_moments, error_log
 
 end
 
 #= Informative Moment Graphing =#
 
 # plot function
-#
-# function plot_series(param_grid, moment_series, param_name, moment_name)
-#
-#   plot_fig = figure()
-#   plot(param_grid, moment_series)
-#   xlabel(param_name)
-#   ylabel(moment_name)
-#   ax = PyPlot.gca()
-#   ax[:legend](loc="lower right")
-#   title(string(moment_name, " Varying ", param_name))
-#
-# end
-#
-#
-# # plot moments varying single parameter
-#
-# function plot_moments(param_grid, stored_moments, param_name)
-#
-#   N = length(param_grid)
-#
-#   # initialize moment arrays
-#   lna2_mean = zeros(N)
-#   b2_mean = zeros(N)
-#   s_mean = zeros(N)
-#   x_mean = zeros(N)
-#   lna2_sd = zeros(N)
-#   b2_sd = zeros(N)
-#   s_sd = zeros(N)
-#   x_sd = zeros(N)
-#   cov_y1_s = zeros(N)
-#   cov_y1_x = zeros(N)
-#   cov_a1_s = zeros(N)
-#   cov_a1_x = zeros(N)
-#   cov_b1_s = zeros(N)
-#   cov_b1_x = zeros(N)
-#
-#   # fill moment arrays
-#   for n in 1:N
-#     lna2_mean[n] = stored_moments[n][1]
-#     b2_mean[n] = stored_moments[n][2]
-#     s_mean[n] = stored_moments[n][3]
-#     x_mean[n] = stored_moments[n][4]
-#     lna2_sd[n] = stored_moments[n][5]
-#     b2_sd[n] = stored_moments[n][6]
-#     s_sd[n] = stored_moments[n][7]
-#     x_sd[n] = stored_moments[n][8]
-#     cov_y1_s[n] = stored_moments[n][9]
-#     cov_y1_x[n] = stored_moments[n][10]
-#     cov_a1_s[n] = stored_moments[n][11]
-#     cov_a1_x[n] = stored_moments[n][12]
-#     cov_b1_s[n] = stored_moments[n][13]
-#     cov_b1_x[n] = stored_moments[n][14]
-#   end
-#
-#   # mean graphs
-#   plot_series(param_grid, lna2_mean, param_name, "Mean log(a2)")
-#   plot_series(param_grid, b2_mean, param_name, "Mean b2")
-#   plot_series(param_grid, s_mean, param_name, "Mean savings")
-#   plot_series(param_grid, x_mean, param_name, "Mean investment")
-#
-#   # std dev graphs
-#   plot_series(param_grid, lna2_sd, param_name, "Std. Dev. log(a2)")
-#   plot_series(param_grid, b2_sd, param_name, "Std. Dev. b2")
-#   plot_series(param_grid, s_sd, param_name, "Std. Dev. savings")
-#   plot_series(param_grid, x_sd, param_name, "Std. Dev. investment")
-#
-#   # cov with s graphs
-#   plot_series(param_grid, cov_y1_s, param_name, "Cov(log(y1),savings)")
-#   plot_series(param_grid, cov_a1_s, param_name, "Cov(log(a1),savings)")
-#   plot_series(param_grid, cov_b1_s, param_name, "Cov(b1,savings)")
-#
-#   # cov with x graphs
-#   plot_series(param_grid, cov_y1_x, param_name, "Cov(log(y1),investment)")
-#   plot_series(param_grid, cov_a1_x, param_name, "Cov(log(a1),investment)")
-#   plot_series(param_grid, cov_b1_x, param_name, "Cov(b1,investment)")
-#
-# end
-#
-#
-# function vary_mu1(initial_state_data,
-#   paramsprefs::ParametersPrefs, paramsshock::ParametersShock, paramsdec::ParametersDec,
-#   param_lower::Float64, param_upper::Float64, param_N::Int64;
-#   N=1000, T=2, restrict_flag=1, S=100, seed=1234, sample_code="nodraw")
-#
-#   # create parameter grid
-#   param_grid = linspace(param_lower, param_upper, param_N)
-#
-#   # create object to store moments at each parameter value
-#   moment_storage = Array{Array{Float64}}(param_N)
-#
-#   # copy parameters structure to modify
-#   paramsprefs_float = deepcopy(paramsprefs)
-#   paramsdec_float = deepcopy(paramsdec)
-#   paramsshock_float = deepcopy(paramsshock)
-#
-#   # for each parameter guess, solve model and calculate full set of moments and store
-#   for n in 1:param_N
-#     println(string("Iter ",n," of ",param_N,": ",param_grid[n]))
-#     paramsprefs_float.mu[1] = param_grid[n]
-#
-#     # simulate dataset and compute moments
-#     sim_moments = dgp_moments(initial_state_data, paramsprefs_float, paramsdec_float, paramsshock_float,
-#       T=T, seed=seed, S=S, N=N, sample_code=sample_code, restrict_flag=1)
-#
-#     # store moments
-#     moment_storage[n] = sim_moments[1]
-#   end
-#
-#   # graph each moment
-#   plot_moments(param_grid, moment_storage, "mu1")
-#
-# end
-#
+
+function plot_series(param_grid, moment_series, param_name, moment_name)
+
+  plot_fig = figure()
+  plot(param_grid, moment_series)
+  xlabel(param_name)
+  ylabel(moment_name)
+  ax = PyPlot.gca()
+  ax[:legend](loc="lower right")
+  title(string(moment_name, " Varying ", param_name))
+
+end
+
+
+# plot moments varying single parameter
+
+function plot_moments(param_grid, stored_moments, param_name; moment_display_flag=1)
+
+  N = length(param_grid)
+
+  # initialize moment arrays
+  lna2_mean = zeros(N)
+  b2_mean = zeros(N)
+  s_mean = zeros(N)
+  x_mean = zeros(N)
+  lna2_sd = zeros(N)
+  b2_sd = zeros(N)
+  s_sd = zeros(N)
+  x_sd = zeros(N)
+  cor_s_x = zeros(N)
+
+  cor_y1_s = zeros(N)
+  cor_a1_s = zeros(N)
+  cor_b1_s = zeros(N)
+  cor_y1_x = zeros(N)
+  cor_a1_x = zeros(N)
+  cor_b1_x = zeros(N)
+
+  e_s_y1 = zeros(N)
+  e_s_y2 = zeros(N)
+  e_s_y3 = zeros(N)
+  e_s_y4 = zeros(N)
+  e_s_a1 = zeros(N)
+  e_s_a2 = zeros(N)
+  e_s_a3 = zeros(N)
+  e_s_a4 = zeros(N)
+  e_s_b1 = zeros(N)
+  e_s_b2 = zeros(N)
+  e_s_b3 = zeros(N)
+  e_s_b4 = zeros(N)
+
+  e_x_y1 = zeros(N)
+  e_x_y2 = zeros(N)
+  e_x_y3 = zeros(N)
+  e_x_y4 = zeros(N)
+  e_x_a1 = zeros(N)
+  e_x_a2 = zeros(N)
+  e_x_a3 = zeros(N)
+  e_x_a4 = zeros(N)
+  e_x_b1 = zeros(N)
+  e_x_b2 = zeros(N)
+  e_x_b3 = zeros(N)
+  e_x_b4 = zeros(N)
+
+  # fill moment arrays
+  for n in 1:N
+     lna2_mean[n] = stored_moments[n][1]
+     b2_mean[n] = stored_moments[n][2]
+     s_mean[n] = stored_moments[n][3]
+     x_mean[n] = stored_moments[n][4]
+     lna2_sd[n] = stored_moments[n][5]
+     b2_sd[n] = stored_moments[n][6]
+     s_sd[n] = stored_moments[n][7]
+     x_sd[n] = stored_moments[n][8]
+     cor_s_x[n] = stored_moments[n][9]
+
+     cor_y1_s[n] = stored_moments[n][10]
+     cor_a1_s[n] = stored_moments[n][11]
+     cor_b1_s[n] = stored_moments[n][12]
+     cor_y1_x[n] = stored_moments[n][13]
+     cor_a1_x[n] = stored_moments[n][14]
+     cor_b1_x[n] = stored_moments[n][15]
+
+     e_s_y1[n] = stored_moments[n][16]
+     e_s_y2[n] = stored_moments[n][17]
+     e_s_y3[n] = stored_moments[n][18]
+     e_s_y4[n] = stored_moments[n][19]
+     e_s_a1[n] = stored_moments[n][20]
+     e_s_a2[n] = stored_moments[n][21]
+     e_s_a3[n] = stored_moments[n][22]
+     e_s_a4[n] = stored_moments[n][23]
+     e_s_b1[n] = stored_moments[n][24]
+     e_s_b2[n] = stored_moments[n][25]
+     e_s_b3[n] = stored_moments[n][26]
+     e_s_b4[n] = stored_moments[n][27]
+
+     e_x_y1[n] = stored_moments[n][28]
+     e_x_y2[n] = stored_moments[n][29]
+     e_x_y3[n] = stored_moments[n][30]
+     e_x_y4[n] = stored_moments[n][31]
+     e_x_a1[n] = stored_moments[n][32]
+     e_x_a2[n] = stored_moments[n][33]
+     e_x_a3[n] = stored_moments[n][34]
+     e_x_a4[n] = stored_moments[n][35]
+     e_x_b1[n] = stored_moments[n][36]
+     e_x_b2[n] = stored_moments[n][37]
+     e_x_b3[n] = stored_moments[n][38]
+     e_x_b4[n] = stored_moments[n][39]
+  end
+
+  ## Plot Selected Series
+
+  if moment_display_flag == 1
+     # mean graphs
+     plot_series(param_grid, lna2_mean, param_name, "Mean log(a2)")
+     plot_series(param_grid, b2_mean, param_name, "Mean b2")
+     plot_series(param_grid, s_mean, param_name, "Mean savings")
+     plot_series(param_grid, x_mean, param_name, "Mean investment")
+
+     # std dev graphs
+     plot_series(param_grid, lna2_sd, param_name, "Std. Dev. log(a2)")
+     plot_series(param_grid, b2_sd, param_name, "Std. Dev. b2")
+     plot_series(param_grid, s_sd, param_name, "Std. Dev. savings")
+     plot_series(param_grid, x_sd, param_name, "Std. Dev. investment")
+
+     # control corr
+     plot_series(param_grid, cor_s_x, param_name, "Cor[savings, investment]")
+  end
+
+
+  if moment_display_flag == 2
+     # corr of state and control
+     plot_series(param_grid, cov_y1_s, param_name, "Cov(savings, log(y1))")
+     plot_series(param_grid, cov_a1_s, param_name, "Cov(savings, log(a1))")
+     plot_series(param_grid, cov_b1_s, param_name, "Cov(savings, b1)")
+     plot_series(param_grid, cov_y1_x, param_name, "Cov(investment, log(y1))")
+     plot_series(param_grid, cov_a1_x, param_name, "Cov(investment, log(a1))")
+     plot_series(param_grid, cov_b1_x, param_name, "Cov(investment, b1)")
+  end
+
+  if moment_display_flag == 3
+     # conditional averages of savings
+     plot_series(param_grid, e_s_y1, param_name, "E[savings | 1st y quantile]")
+     plot_series(param_grid, e_s_y2, param_name, "E[savings | 2nd y quantile]")
+     plot_series(param_grid, e_s_y3, param_name, "E[savings | 3rd y quantile]")
+     plot_series(param_grid, e_s_y4, param_name, "E[savings | 4th y quantile]")
+     plot_series(param_grid, e_s_a1, param_name, "E[savings | 1st a quantile]")
+     plot_series(param_grid, e_s_a2, param_name, "E[savings | 2nd a quantile]")
+     plot_series(param_grid, e_s_a3, param_name, "E[savings | 3rd a quantile]")
+     plot_series(param_grid, e_s_a4, param_name, "E[savings | 4th a quantile]")
+     plot_series(param_grid, e_s_b1, param_name, "E[savings | 1st b quantile]")
+     plot_series(param_grid, e_s_b2, param_name, "E[savings | 2nd b quantile]")
+     plot_series(param_grid, e_s_b3, param_name, "E[savings | 3rd b quantile]")
+     plot_series(param_grid, e_s_b4, param_name, "E[savings | 4th b quantile]")
+  end
+
+  if moment_display_flag == 4
+     # conditional averages of investment
+     plot_series(param_grid, e_x_y1, param_name, "E[investment | 1st y quantile]")
+     plot_series(param_grid, e_x_y2, param_name, "E[investment | 2nd y quantile]")
+     plot_series(param_grid, e_x_y3, param_name, "E[investment | 3rd y quantile]")
+     plot_series(param_grid, e_x_y4, param_name, "E[investment | 4th y quantile]")
+     plot_series(param_grid, e_x_a1, param_name, "E[investment | 1st a quantile]")
+     plot_series(param_grid, e_x_a2, param_name, "E[investment | 2nd a quantile]")
+     plot_series(param_grid, e_x_a3, param_name, "E[investment | 3rd a quantile]")
+     plot_series(param_grid, e_x_a4, param_name, "E[investment | 4th a quantile]")
+     plot_series(param_grid, e_x_b1, param_name, "E[investment | 1st b quantile]")
+     plot_series(param_grid, e_x_b2, param_name, "E[investment | 2nd b quantile]")
+     plot_series(param_grid, e_x_b3, param_name, "E[investment | 3rd b quantile]")
+     plot_series(param_grid, e_x_b4, param_name, "E[investment | 4th b quantile]")
+  end
+
+end
+
+## Parameter Specific Code
+
+function vary_B_hi(initial_state_data, param_vec::Array,
+  paramsprefs::ParametersPrefs, paramsshock::ParametersShock, paramsdec::ParametersDec,
+  param_lower::Float64, param_upper::Float64, param_N::Int64;
+  N=1000, T=2, restrict_flag=1, S=100, seed=1234, sample_code="nodraw", par_flag=0, par_N=2)
+
+  # create parameter grid
+  param_grid = linspace(param_lower, param_upper, param_N)
+
+  # create object to store moments at each parameter value
+  moment_storage = Array{Array{Float64}}(param_N)
+
+  # copy parameters structure to modify
+  paramsprefs_float = deepcopy(paramsprefs)
+  paramsdec_float = deepcopy(paramsdec)
+  paramsshock_float = deepcopy(paramsshock)
+
+  # set parameters according to guess
+  paramsprefs_float.B_hi, paramsprefs_float.B_lo, paramsprefs_float.alphaT1_hi, paramsprefs_float.alphaT1_lo,
+  paramsprefs_float.gamma_y[2], paramsprefs_float.gamma_y[3], paramsprefs_float.gamma_y[4],
+  paramsprefs_float.gamma_a[1], paramsprefs_float.gamma_a[2], paramsprefs_float.gamma_a[3], paramsprefs_float.gamma_a[4],
+  paramsprefs_float.gamma_b[1], paramsprefs_float.gamma_b[2], paramsprefs_float.gamma_b[3], paramsprefs_float.gamma_b[4],
+  paramsshock_float.eps_b_var, paramsdec_float.iota0, paramsdec_float.iota1, paramsdec_float.iota2, paramsdec_float.iota3 = param_vec
+
+  # for each parameter guess, solve model and calculate full set of moments and store
+  for n in 1:param_N
+    println(string("Iter ",n," of ",param_N,": ",param_grid[n]))
+    paramsprefs_float.B_hi = param_grid[n]
+
+    if param_vec[1] < 1. || param_vec[2] < 1. || param_vec[3] <= 0. || param_vec[3] >= 1. ||
+      param_vec[4] <= 0. || param_vec[4] >= 1. || param_vec[16] <= 0. ||
+      param_vec[1] < param_vec[2] || param_vec[3] < param_vec[4]
+      obj = Inf
+    else
+      # simulate dataset and compute moments, whether serial or parallel
+      if par_flag == 0
+         sim_moments, error_log = dgp_moments(initial_state_data, paramsprefs_float, paramsdec_float, paramsshock_float,
+            T=T, seed=seed, S=S, N=N, sample_code=sample_code, restrict_flag=restrict_flag, error_log_flag=error_log_flag)
+      elseif par_flag == 1
+         sim_moments, error_log = dgp_moments_par(initial_state_data, paramsprefs_float, paramsdec_float, paramsshock_float,
+            T=T, seed=seed, S=S, N=N, sample_code=sample_code, restrict_flag=restrict_flag, par_N=par_N, error_log_flag=error_log_flag)
+      else
+         throw(error("par_flag must be 0 or 1"))
+      end
+
+      # store moments
+      moment_storage[n] = sim_moments[1]
+
+    end
+
+  end
+
+  param_name = "B_hi"
+
+  return param_grid, moment_storage, param_name
+
+  # graph each moment
+  # plot_moments(param_grid, moment_storage, "B_hi")
+
+end
+
 # function vary_mu2(initial_state_data,
 #   paramsprefs::ParametersPrefs, paramsshock::ParametersShock, paramsdec::ParametersDec,
 #   param_lower::Float64, param_upper::Float64, param_N::Int64;

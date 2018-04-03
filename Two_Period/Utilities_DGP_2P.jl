@@ -382,13 +382,13 @@ function moment_gen_dist(formatted_data; restrict_flag=1)
     uncond_moment_stack  = vcat(uncond_moment_stack, x_moments[i])
   end
 
+  uncond_moment_stack  = vcat(uncond_moment_stack, cov_s_x)
+
   for i in 1:2
     uncond_moment_stack = vcat(uncond_moment_stack, y_cov[i])
     uncond_moment_stack = vcat(uncond_moment_stack, a_cov[i])
     uncond_moment_stack  = vcat(uncond_moment_stack, b_cov[i])
   end
-
-  uncond_moment_stack  = vcat(uncond_moment_stack, cov_s_x)
 
   # trim leading 0 that was necessary for initializtion before stack
   uncond_moment_stack = uncond_moment_stack[2:length(uncond_moment_stack)]
@@ -473,9 +473,9 @@ function moment_gen_dist(formatted_data; restrict_flag=1)
   # list of moments
   moments_desc = ["Mean lna2", "Mean b2", "Mean savings", "Mean x",
     "Stddev lna2", "Stddev b", "Stddev savings", "Stddev x",
+    "Cor[s,x]",
     "Cor[savings,y]", "Cor[savings,a]", "Cor[savings,b]",
     "Cor[x,y]", "Cor[x,a]", "Cor[x,b]",
-    "Cor[s,x]",
     "E[savings|1st quant. y]","E[savings|2nd quant. y]","E[savings|3rd quant. y]","E[savings|4th quant. y]",
     "E[savings|1st quant. a]","E[savings|2nd quant. a]","E[savings|3rd quant. a]","E[savings|4th quant. a]",
     "E[savings|1st quant. b]","E[savings|2nd quant. b]","E[savings|3rd quant. b]","E[savings|4th quant. b]",
@@ -501,3 +501,7 @@ function moment_gen_dist(formatted_data; restrict_flag=1)
   return moments_out, moments_desc
 
 end
+
+#= Simulated Dataset =#
+
+function sim_dataset(initial_states::Array{Float64})
