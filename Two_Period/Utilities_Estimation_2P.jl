@@ -90,26 +90,26 @@ end
 #= DGP Simulation and Moment Generation =#
 
 function dgp_moments(initial_state_data, paramsprefs::ParametersPrefs, paramsdec::ParametersDec, paramsshock::ParametersShock;
-  T=2, seed=1234, S=10, N=100, sample_code="nodraw", restrict_flag=1)
+  T=2, seed=1234, S=10, N=100, sample_code="nodraw", restrict_flag=1, error_log_flag=0)
 
   # simulate dataset
   sim_shocks = sim_paths(initial_state_data, paramsshock,
           T=T, seed=seed, N=N, S=S, sample_code=sample_code)
 
   sim_data = sim_choices(sim_shocks[1], sim_shocks[2][1], sim_shocks[3][1],
-    paramsprefs, paramsdec, paramsshock)
+    paramsprefs, paramsdec, paramsshock, error_log_flag=error_log_flag)
 
   # calculate simulated data moments
   sim_moments = moment_gen_dist(sim_data, restrict_flag=restrict_flag)
 
-  return sim_moments
+  return sim_moments, sim_data[6]
 
 end
 
 # parallelize choices
 
 function dgp_moments_par(initial_state_data, paramsprefs::ParametersPrefs, paramsdec::ParametersDec, paramsshock::ParametersShock;
-  T=2, seed=1234, S=10, N=100, sample_code="nodraw", restrict_flag=1, par_N=2)
+  T=2, seed=1234, S=10, N=100, sample_code="nodraw", restrict_flag=1, par_N=2, error_log_flag=0)
 
   # simulate dataset
   sim_shocks = sim_paths(initial_state_data, paramsshock,
@@ -159,7 +159,17 @@ function dgp_moments_par(initial_state_data, paramsprefs::ParametersPrefs, param
    # calculate simulated data moments
    sim_moments = moment_gen_dist(sim_data, restrict_flag=restrict_flag)
 
-  return sim_moments
+   # stack error logs
+   error_log = Any[]
+   if error_log_flag == 1
+      for par_index in 1:par_N
+         if isempty(sim_choices_par[par_index][6]) == false
+            push!(error_log, sim_choices_par[par_index][6])
+         end
+      end
+   end
+
+  return sim_moments, error_log
 
 end
 
@@ -315,7 +325,7 @@ function smm_write_results(path, data_formatted, paramsprefs::ParametersPrefs, p
    eps_b_var_start=0.022, iota0_start=1.87, iota1_start=0.42, iota2_start=0.06, iota3_start=0.0,
   N=100, T=2, S=100,
   opt_code="neldermead", sample_code="nodraw", restrict_flag=1, seed=1234, error_log_flag=0,
-  opt_trace=false, opt_iter=1000, opt_tol=1e-9, print_flag=true, par_flag=0, par_N=4)
+  opt_trace=false, opt_iter=1000, opt_tol=1e-9, print_flag=false, par_flag=0, par_N=4)
 
    # run SMM
    estimation_time = @elapsed estimation_result = smm(data_formatted, paramsprefs, paramsdec, paramsshock,
@@ -395,10 +405,10 @@ function smm_obj(initial_state_data, target_moments, W::Array, param_vec::Array,
     # simulate dataset and compute moments, whether serial or parallel
     if par_flag == 0
        sim_moments = dgp_moments(initial_state_data, paramsprefs, paramsdec, paramsshock,
-         T=T, seed=seed, S=S, N=N, sample_code=sample_code, restrict_flag=restrict_flag)
+         T=T, seed=seed, S=S, N=N, sample_code=sample_code, restrict_flag=restrict_flag, error_log_flag=error_log_flag)
    elseif par_flag == 1
       sim_moments = dgp_moments_par(initial_state_data, paramsprefs, paramsdec, paramsshock,
-        T=T, seed=seed, S=S, N=N, sample_code=sample_code, restrict_flag=restrict_flag, par_N=par_N)
+        T=T, seed=seed, S=S, N=N, sample_code=sample_code, restrict_flag=restrict_flag, par_N=par_N, error_log_flag=error_log_flag)
    else
       throw(error("par_flag must be 0 or 1"))
    end
@@ -460,10 +470,10 @@ function smm_obj_testing(data_formatted, param_vec::Array,
      # simulate dataset and compute moments, whether serial or parallel
       if par_flag == 0
          sim_moments = dgp_moments(data_formatted, paramsprefs_float, paramsdec_float, paramsshock_float,
-         T=T, seed=seed, S=S, N=N, sample_code=sample_code, restrict_flag=restrict_flag)
+         T=T, seed=seed, S=S, N=N, sample_code=sample_code, restrict_flag=restrict_flag, error_log_flag=error_log_flag)
       elseif par_flag == 1
          sim_moments = dgp_moments_par(data_formatted, paramsprefs_float, paramsdec_float, paramsshock_float,
-         T=T, seed=seed, S=S, N=N, sample_code=sample_code, restrict_flag=restrict_flag, par_N=par_N)
+         T=T, seed=seed, S=S, N=N, sample_code=sample_code, restrict_flag=restrict_flag, par_N=par_N, error_log_flag=error_log_flag)
       else
          throw(error("par_flag must be 0 or 1"))
       end

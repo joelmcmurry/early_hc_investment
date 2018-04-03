@@ -54,6 +54,7 @@ mutable struct SimChoiceArg
    paramsprefs::ParametersPrefs
    paramsdec::ParametersDec
    paramsshock::ParametersShock
+   error_log_flag::Int64
 
 end
 
@@ -141,7 +142,7 @@ end
 # divide paths up into N sections for parallel processing
 
 function sim_paths_split(initial_states, shocks_y, shocks_b,
-  paramsprefs::ParametersPrefs, paramsdec::ParametersDec, paramsshock::ParametersShock; par_N=2)
+  paramsprefs::ParametersPrefs, paramsdec::ParametersDec, paramsshock::ParametersShock; par_N=2, error_log_flag=0)
 
    # initialize array of simulated choice sections
    sim_choices_arg_array = Array{SimChoiceArg}(par_N)
@@ -162,7 +163,7 @@ function sim_paths_split(initial_states, shocks_y, shocks_b,
 
       # create and store simulated choice argument type with subset paths
       sim_choices_arg_section = SimChoiceArg(initial_states_section, shocks_y_section, shocks_b_section,
-        paramsprefs, paramsdec, paramsshock)
+        paramsprefs, paramsdec, paramsshock, error_log_flag)
       sim_choices_arg_array[i] = sim_choices_arg_section
 
       # update indices
@@ -179,7 +180,10 @@ end
 # takes multiple arguments
 
 function sim_choices(initial_states::Array{Float64}, shocks_y::Array{Float64}, shocks_b::Array{Float64},
-  paramsprefs::ParametersPrefs, paramsdec::ParametersDec, paramsshock::ParametersShock)
+  paramsprefs::ParametersPrefs, paramsdec::ParametersDec, paramsshock::ParametersShock; error_log_flag=0)
+
+  # initialize error log
+  error_log = Any[]
 
   # construct types given preferences
   type_vec = type_construct(paramsprefs.B_hi, paramsprefs.B_lo, paramsprefs.alphaT1_hi, paramsprefs.alphaT1_lo)
@@ -249,9 +253,16 @@ function sim_choices(initial_states::Array{Float64}, shocks_y::Array{Float64}, s
       paramsdec.alphaT2 = 1. - paramsdec.alphaT1
 
       # solve childhood period decisions
-      V0_type, choices0_type = bellman_optim_child!(states_y[1][n,1],
+      V0_type, choices0_type, converged_check, iterations_taken, error_log_state = bellman_optim_child!(states_y[1][n,1],
         states_a[1][n,1], states_b[1][n,1], paramsdec, paramsshock,
-        aprime_start=aprime_start, x_start=x_start)
+        aprime_start=aprime_start, x_start=x_start, error_log_flag=error_log_flag)
+
+      # record errors if prompted
+      if error_log_flag == 1
+        if isempty(error_log_state) == false
+          push!(error_log, error_log_state)
+        end
+      end
 
       # store decisions conditional on type
       choices_savings_n_type = ones(S)*choices0_type[1] - ones(S)*states_a[1][n,1]*(1+paramsdec.r)
@@ -276,7 +287,7 @@ function sim_choices(initial_states::Array{Float64}, shocks_y::Array{Float64}, s
 
   end
 
-  return states_y, states_a, states_b, choices_savings, choices_x
+  return states_y, states_a, states_b, choices_savings, choices_x, error_log
 
 end
 
@@ -285,7 +296,7 @@ end
 function sim_choices(sim_choices_arg::SimChoiceArg)
 
    sim_choices(sim_choices_arg.initial_states, sim_choices_arg.shocks_y, sim_choices_arg.shocks_b,
-    sim_choices_arg.paramsprefs, sim_choices_arg.paramsdec, sim_choices_arg.paramsshock)
+    sim_choices_arg.paramsprefs, sim_choices_arg.paramsdec, sim_choices_arg.paramsshock, error_log_flag=sim_choices_arg.error_log_flag)
 
 end
 
@@ -340,11 +351,11 @@ function moment_gen_dist(formatted_data; restrict_flag=1)
     savings_mom_S[:,s] = [mean(formatted_data[4][1][:,s]) var(formatted_data[4][1][:,s])^0.5]
     x_mom_S[:,s] = [mean(formatted_data[5][1][:,s]) var(formatted_data[5][1][:,s])^0.5]
 
-    y_cov_S[:,s] = [cov(log.(formatted_data[1][1][:,s]),formatted_data[4][1][:,s]) cov(log.(formatted_data[1][1][:,s]),formatted_data[5][1][:,s])]
-    a_cov_S[:,s] = [cov(log.(formatted_data[2][1][:,s]),formatted_data[4][1][:,s]) cov(log.(formatted_data[2][1][:,s]),formatted_data[5][1][:,s])]
-    b_cov_S[:,s] = [cov(log.(formatted_data[3][1][:,s]),formatted_data[4][1][:,s]) cov(log.(formatted_data[3][1][:,s]),formatted_data[5][1][:,s])]
+    y_cov_S[:,s] = [cor(log.(formatted_data[1][1][:,s]),formatted_data[4][1][:,s]) cor(log.(formatted_data[1][1][:,s]),formatted_data[5][1][:,s])]
+    a_cov_S[:,s] = [cor(log.(formatted_data[2][1][:,s]),formatted_data[4][1][:,s]) cor(log.(formatted_data[2][1][:,s]),formatted_data[5][1][:,s])]
+    b_cov_S[:,s] = [cor(log.(formatted_data[3][1][:,s]),formatted_data[4][1][:,s]) cor(log.(formatted_data[3][1][:,s]),formatted_data[5][1][:,s])]
 
-    cov_s_x_S[:,s] = cov(formatted_data[4][1][:,s],formatted_data[5][1][:,s])
+    cov_s_x_S[:,s] = cor(formatted_data[4][1][:,s],formatted_data[5][1][:,s])
 
   end
 
@@ -462,9 +473,9 @@ function moment_gen_dist(formatted_data; restrict_flag=1)
   # list of moments
   moments_desc = ["Mean lna2", "Mean b2", "Mean savings", "Mean x",
     "Stddev lna2", "Stddev b", "Stddev savings", "Stddev x",
-    "Cov[savings,y]", "Cov[savings,a]", "Cov[savings,b]",
-    "Cov[x,y]", "Cov[x,a]", "Cov[x,b]",
-    "Cov[s,x]",
+    "Cor[savings,y]", "Cor[savings,a]", "Cor[savings,b]",
+    "Cor[x,y]", "Cor[x,a]", "Cor[x,b]",
+    "Cor[s,x]",
     "E[savings|1st quant. y]","E[savings|2nd quant. y]","E[savings|3rd quant. y]","E[savings|4th quant. y]",
     "E[savings|1st quant. a]","E[savings|2nd quant. a]","E[savings|3rd quant. a]","E[savings|4th quant. a]",
     "E[savings|1st quant. b]","E[savings|2nd quant. b]","E[savings|3rd quant. b]","E[savings|4th quant. b]",
