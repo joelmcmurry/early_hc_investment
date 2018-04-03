@@ -49,6 +49,7 @@ end
 
 mutable struct SimChoiceArg
    initial_states::Array{Float64}
+   sample_N_M::Array{Float64}
    shocks_y::Array{Float64}
    shocks_b::Array{Float64}
    paramsprefs::ParametersPrefs
@@ -98,10 +99,10 @@ end
 
 #= DGP Simulation =#
 
-## For Each HH, Draw Preference Vector and Simulate S Paths of Shocks, Initial Conditions Given or Drawn Non-Parametrically from Data
+## Draw N x M x S Household/Type/Shock Pairs (default is N=number in data)
 
-function sim_paths(initial_state_data, paramsshock::ParametersShock;
-  T=2, seed=1234, S=10, N=100, sample_code="nodraw")
+function sim_paths(initial_state_data, paramsshock::ParametersShock, paramsprefs::ParametersPrefs;
+  seed=1234, N=100, M=10, S=10, sample_code="draw")
 
   # draw initial states and extract N if not sampling
   if sample_code=="nodraw"
@@ -119,37 +120,61 @@ function sim_paths(initial_state_data, paramsshock::ParametersShock;
     throw(error("sample_code must be nodraw or draw"))
   end
 
-  # store household shocks
-  shocks_y = Array{Array{Float64}}(1)
-  shocks_b = Array{Array{Float64}}(1)
+  # draw M type draws for each of N covariate vector
+  sample_N_M = zeros(N*M,4)
 
-  # draw shocks, updating seed by +1 after every period to get different vector of draws
-  # for each household and time, draw S shocks, so we have S paths per household
-  for t in 1:T-1
-    srand(seed); shocks_y_t = rand(paramsshock.eps_y_dist,N,S)
-    srand(seed); shocks_b_t = rand(paramsshock.eps_b_dist,N,S)
+  # draw M x N random type draws
+  srand(seed); type_draws = rand(N,M)
 
-    shocks_y[t] = shocks_y_t
-    shocks_b[t] = shocks_b_t
+  # keep count of sample id
+  sample_id = 1
+  for n in 1:N
+    # compute type probabilities
+    type_probs_n = type_prob(initial_states[n,1], initial_states[n,1], initial_states[n,1], paramsprefs)
 
-    seed += 1
+    for m in 1:M
+      # assign initial conditions
+      sample_N_M[sample_id,1:3] = initial_states[n,1:3]
+      # assing types based on type draws
+      if type_draws[n,m] <= type_probs_n[1]
+        sample_N_M[sample_id,4] = 1.
+      elseif type_draws[n,m] > type_probs_n[1] && type_draws[n,m] <= type_probs_n[1]+type_probs_n[2]
+        sample_N_M[sample_id,4] = 2.
+      elseif type_draws[n,m] > type_probs_n[1]+type_probs_n[2] && type_draws[n,m] <= type_probs_n[1]+type_probs_n[2]+type_probs_n[3]
+        sample_N_M[sample_id,4] = 3.
+      else
+        sample_N_M[sample_id,4] = 4.
+      end
+
+      # advane sample id
+      sample_id +=1
+
+    end
+
   end
 
-  return initial_states, shocks_y, shocks_b
+  # draw S shocks for each of N x M covariate/type combinations, updating seed from previous draws
+  srand(seed+1); shocks_y = rand(paramsshock.eps_y_dist,N*M,S)
+  srand(seed+1); shocks_b = rand(paramsshock.eps_b_dist,N*M,S)
+
+  return initial_states, sample_N_M, shocks_y, shocks_b
 
 end
 
 # divide paths up into N sections for parallel processing
 
-function sim_paths_split(initial_states, shocks_y, shocks_b,
+function sim_paths_split(initial_states, sample_N_M, shocks_y, shocks_b,
   paramsprefs::ParametersPrefs, paramsdec::ParametersDec, paramsshock::ParametersShock; par_N=2, error_log_flag=0)
 
    # initialize array of simulated choice sections
    sim_choices_arg_array = Array{SimChoiceArg}(par_N)
 
-   # extract sample size and calculate subset length
-   N = length(initial_states[:,1])
+   # extract number of unique initial conditions and  calculate subset length
+   N = length(unique(initial_states,1)[:,1])
    subset_length = Int(ceil(N/par_N))
+
+   # extract number of shocks
+   S = length(shocks_y[1,:])
 
    # initialize indices for splitting
    index_start = 1
@@ -157,12 +182,36 @@ function sim_paths_split(initial_states, shocks_y, shocks_b,
 
    for i in 1:par_N
       # subset households and paths
-      initial_states_section = initial_states[index_start:index_end,:]
-      shocks_y_section = shocks_y[index_start:index_end,:]
-      shocks_b_section = shocks_b[index_start:index_end,:]
+      initial_states_section = unique(initial_states,1)[index_start:index_end,:]
+
+      # initialize sample and shock sections
+      sample_N_M_section = zeros(1,4)
+      shocks_y_section = zeros(1,S)
+      shocks_b_section = zeros(1,S)
+
+      # loop through initial conditions and fill sample and shock sections with households of appropriate initial conditions
+      for j in 1:length(initial_states_section[:,1])
+
+        # indentify all simulated inviduals with these initial conditions
+        y_match = find(x->x==initial_states_section[j,1],sample_N_M[:,1])
+        a_match = find(x->x==initial_states_section[j,2],sample_N_M[:,2])
+        b_match = find(x->x==initial_states_section[j,3],sample_N_M[:,3])
+
+        row_match = intersect(y_match, a_match, b_match)
+
+        sample_N_M_section = vcat(sample_N_M_section, sample_N_M[row_match,:])
+        shocks_y_section = vcat(shocks_y_section, shocks_y[row_match,:])
+        shocks_b_section = vcat(shocks_b_section, shocks_y[row_match,:])
+
+      end
+
+      # trim leading zeros used for initialization
+      sample_N_M_section = sample_N_M_section[2:length(sample_N_M_section[:,1]),:]
+      shocks_y_section = shocks_y_section[2:length(shocks_y_section[:,1]),:]
+      shocks_b_section = shocks_b_section[2:length(shocks_b_section[:,1]),:]
 
       # create and store simulated choice argument type with subset paths
-      sim_choices_arg_section = SimChoiceArg(initial_states_section, shocks_y_section, shocks_b_section,
+      sim_choices_arg_section = SimChoiceArg(initial_states_section, sample_N_M_section, shocks_y_section, shocks_b_section,
         paramsprefs, paramsdec, paramsshock, error_log_flag)
       sim_choices_arg_array[i] = sim_choices_arg_section
 
@@ -179,8 +228,9 @@ end
 
 # takes multiple arguments
 
-function sim_choices(initial_states::Array{Float64}, shocks_y::Array{Float64}, shocks_b::Array{Float64},
-  paramsprefs::ParametersPrefs, paramsdec::ParametersDec, paramsshock::ParametersShock; error_log_flag=0)
+function sim_choices(initial_states::Array{Float64}, sample_N_M::Array{Float64}, shocks_y::Array{Float64}, shocks_b::Array{Float64},
+  paramsprefs::ParametersPrefs, paramsdec::ParametersDec, paramsshock::ParametersShock;
+  error_log_flag=0)
 
   # initialize error log
   error_log = Any[]
@@ -188,11 +238,12 @@ function sim_choices(initial_states::Array{Float64}, shocks_y::Array{Float64}, s
   # construct types given preferences
   type_vec = type_construct(paramsprefs.B_hi, paramsprefs.B_lo, paramsprefs.alphaT1_hi, paramsprefs.alphaT1_lo)
 
-  # extract N, T, and S from initial states and shock paths
+  # extract N, M, and S from initial states and shock paths
   N = length(initial_states[:,1])
+  M = Int(length(sample_N_M[:,1])/N)
   S = length(shocks_y[1,:])
 
-  # store household state and decisions (will be averaged over types along S paths of shocks)
+  # store household state and decisions
   states_y = Array{Array{Float64}}(2)
   states_a = Array{Array{Float64}}(2)
   states_b = Array{Array{Float64}}(2)
@@ -201,42 +252,37 @@ function sim_choices(initial_states::Array{Float64}, shocks_y::Array{Float64}, s
 
   for t in 1:2
     # initialize states
-    states_y[t] = zeros(N,S)
-    states_a[t] = zeros(N,S)
-    states_b[t] = zeros(N,S)
+    states_y[t] = zeros(N*M,S)
+    states_a[t] = zeros(N*M,S)
+    states_b[t] = zeros(N*M,S)
 
     # initialize choices
     if t == 1
-      choices_savings[t] = zeros(N,S)
-      choices_x[t] = zeros(N,S)
+      choices_savings[t] = zeros(N*M,S)
+      choices_x[t] = zeros(N*M,S)
     end
   end
 
   # store initial state for each path and household
-  states_y[1] = initial_states[:,1].*ones(N,S)
-  states_a[1] = initial_states[:,2].*ones(N,S)
-  states_b[1] = initial_states[:,3].*ones(N,S)
+  states_y[1] = sample_N_M[:,1].*ones(N*M,S)
+  states_a[1] = sample_N_M[:,2].*ones(N*M,S)
+  states_b[1] = sample_N_M[:,3].*ones(N*M,S)
 
-  # for each household, compute decisions for each type and compute average choice/state for each shock given type probability
+  # store decision rules by initial condition and type
+  choices_lookup_init_type = zeros(N*length(type_vec),6)
+
+  # initialize index for above
+  init_type_index = 1
+
+  # for each initial condition and type, compute choices and assign choices to sample
   for n in 1:N
 
     # println(n)
-
-    # calculate probability of each type given initial states
-    type_probs_n = type_prob(states_y[1][n,1], states_a[1][n,1], states_b[1][n,1], paramsprefs)
 
     # initialize choices for endogenous starting values within HH (across types)
     choices0_type = zeros(2)
 
     for type_index in 1:4
-
-      # store choices and states for HH and type
-      choices_savings_n_type = zeros(S)
-      choices_x_n_type = zeros(S)
-
-      states_y_n_type = zeros(S)
-      states_a_n_type = zeros(S)
-      states_b_n_type = zeros(S)
 
       # start optimization with solution for previous type
       if type_index != 1
@@ -253,8 +299,8 @@ function sim_choices(initial_states::Array{Float64}, shocks_y::Array{Float64}, s
       paramsdec.alphaT2 = 1. - paramsdec.alphaT1
 
       # solve childhood period decisions
-      V0_type, choices0_type, converged_check, iterations_taken, error_log_state = bellman_optim_child!(states_y[1][n,1],
-        states_a[1][n,1], states_b[1][n,1], paramsdec, paramsshock,
+      V0_type, choices0_type, converged_check, iterations_taken, error_log_state = bellman_optim_child!(initial_states[n,1],
+        initial_states[n,1], initial_states[n,1], paramsdec, paramsshock,
         aprime_start=aprime_start, x_start=x_start, error_log_flag=error_log_flag)
 
       # record errors if prompted
@@ -264,25 +310,41 @@ function sim_choices(initial_states::Array{Float64}, shocks_y::Array{Float64}, s
         end
       end
 
-      # store decisions conditional on type
-      choices_savings_n_type = ones(S)*choices0_type[1] - ones(S)*states_a[1][n,1]*(1+paramsdec.r)
-      choices_x_n_type = ones(S)*choices0_type[2]
+      # store decision rules by initial conditions and type
+      choices_lookup_init_type[init_type_index,1:3] = initial_states[n,1:3]
+      choices_lookup_init_type[init_type_index,4] = type_index
+      choices_lookup_init_type[init_type_index,5:6] = choices0_type
 
-      # calculate terminal period states given shocks conditional on type
-      for s in 1:S
-        states_y_n_type[s] = Y_evol(states_y[1][n,s], paramsdec.rho_y, shocks_y[n,s])
-        states_a_n_type[s] = choices_savings_n_type[s] + states_a[1][n,s]*(1+paramsdec.r)
-        states_b_n_type[s] = HC_prod(states_b[1][n,s], choices_x_n_type[s], shocks_b[n,s],
-          paramsdec.iota0[1], paramsdec.iota1[1], paramsdec.iota2[1], paramsdec.iota3[1])
-      end
+      # advance index
+      init_type_index += 1
 
-      # weight choices and states by probability of type and add to type-averaged path along S shocks
-      choices_savings[1][n,:] += choices_savings_n_type*type_probs_n[type_index]
-      choices_x[1][n,:] += choices_x_n_type*type_probs_n[type_index]
-      states_y[2][n,:] += states_y_n_type*type_probs_n[type_index]
-      states_a[2][n,:] += states_a_n_type*type_probs_n[type_index]
-      states_b[2][n,:] += states_b_n_type*type_probs_n[type_index]
+    end
 
+  end
+
+  # loop through sample and assign decision rules and compute state evolution
+  for j in 1:M*N
+
+    # extract index of initial conditions and type
+    y_match = find(x->x==sample_N_M[j,1],choices_lookup_init_type[:,1])
+    a_match = find(x->x==sample_N_M[j,2],choices_lookup_init_type[:,2])
+    b_match = find(x->x==sample_N_M[j,3],choices_lookup_init_type[:,3])
+    type_match = find(x->x==sample_N_M[j,4],choices_lookup_init_type[:,4])
+
+    row_match = intersect(y_match, a_match, b_match, type_match)
+
+    # look up decisions given initial conditions and type
+    choices_init_type = choices_lookup_init_type[row_match,5:6]
+
+    choices_savings[1][j,:] = ones(S)*choices_init_type[1] - ones(S)*states_a[1][n,1]*(1+paramsdec.r)
+    choices_x[1][j,:] = ones(S)*choices_init_type[2]
+
+    # calculate terminal period states given shocks conditional on type
+    for s in 1:S
+      states_y[2][j,s] = Y_evol(states_y[1][j,s], paramsdec.rho_y, shocks_y[j,s])
+      states_a[2][j,s] = choices_savings[1][j,s] + states_a[1][j,s]*(1+paramsdec.r)
+      states_b[2][j,s] = HC_prod(states_b[1][j,s], choices_x[1][j,s], shocks_b[j,s],
+        paramsdec.iota0[1], paramsdec.iota1[1], paramsdec.iota2[1], paramsdec.iota3[1])
     end
 
   end
@@ -295,7 +357,7 @@ end
 
 function sim_choices(sim_choices_arg::SimChoiceArg)
 
-   sim_choices(sim_choices_arg.initial_states, sim_choices_arg.shocks_y, sim_choices_arg.shocks_b,
+   sim_choices(sim_choices_arg.initial_states, sim_choices.arg.sample_N_M, sim_choices_arg.shocks_y, sim_choices_arg.shocks_b,
     sim_choices_arg.paramsprefs, sim_choices_arg.paramsdec, sim_choices_arg.paramsshock, error_log_flag=sim_choices_arg.error_log_flag)
 
 end
@@ -501,7 +563,3 @@ function moment_gen_dist(formatted_data; restrict_flag=1)
   return moments_out, moments_desc
 
 end
-
-#= Simulated Dataset =#
-
-function sim_dataset(initial_states::Array{Float64})
