@@ -18,6 +18,14 @@ paramsdec = ParametersDec()
 paramsprefs = ParametersPrefs()
 paramsshock = ParametersShock()
 
+#= Test DGP =#
+
+initial_state_data = nlsy79data_formatted
+
+test_paths = sim_paths(initial_state_data, paramsshock, paramsprefs, seed=1234, N=100, M=10, S=10, sample_code="draw")
+
+test_choices = sim_choices(test_paths[1], test_paths[2], test_paths[3], test_paths[4], paramsprefs, paramsdec, paramsshock)
+
 #= Testing Moment Generation =#
 
 initial_state_data = nlsy79data_formatted

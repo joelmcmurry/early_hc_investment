@@ -336,7 +336,7 @@ function sim_choices(initial_states::Array{Float64}, sample_N_M::Array{Float64},
     # look up decisions given initial conditions and type
     choices_init_type = choices_lookup_init_type[row_match,5:6]
 
-    choices_savings[1][j,:] = ones(S)*choices_init_type[1] - ones(S)*states_a[1][n,1]*(1+paramsdec.r)
+    choices_savings[1][j,:] = ones(S)*choices_init_type[1] - ones(S)*states_a[1][j,1]*(1+paramsdec.r)
     choices_x[1][j,:] = ones(S)*choices_init_type[2]
 
     # calculate terminal period states given shocks conditional on type
@@ -371,68 +371,21 @@ function moment_gen_dist(formatted_data; restrict_flag=1)
   # extract S given data
   S = length(formatted_data[1][1][1,:])
 
-  # extract N given data
-  N = length(formatted_data[1][1][:,1])
+  # extract NxM given data
+  N_M = length(formatted_data[1][1][:,1])
 
   ## Unconditional Moments
 
   # initialize storage of state and choice moments
   # y_moments = zeros(2)
-  a_moments = zeros(2)
-  b_moments = zeros(2)
-  savings_moments = zeros(2)
-  x_moments = zeros(2)
-  y_cov = zeros(2)
-  a_cov = zeros(2)
-  b_cov = zeros(2)
-  cov_s_x = zeros(1)
-
-  # initialize s path specific moments
-
-  # first and second (std dev) moments of terminal-period states and controls
-  # y_mom_S = zeros(2,S)
-  a_mom_S = zeros(2,S)
-  b_mom_S = zeros(2,S)
-  savings_mom_S = zeros(2,S)
-  x_mom_S = zeros(2,S)
-
-  # covariances of initial states and controls
-  y_cov_S = zeros(2,S)
-  a_cov_S = zeros(2,S)
-  b_cov_S = zeros(2,S)
-
-  # covariance of controls
-  cov_s_x_S = zeros(1,S)
-
-  # compute moments for each shock draw (and across draws from empirical distribution of initial conditions)
-  for s in 1:S
-
-    # y_mom_S[:,s] = [mean(log.(formatted_data[1][2][:,s])) var(log.(formatted_data[1][2][:,s]))^0.5]
-    a_mom_S[:,s] = [mean(log.(formatted_data[2][2][:,s])) var(log.(formatted_data[2][2][:,s]))^0.5]
-    b_mom_S[:,s] = [mean(formatted_data[3][2][:,s]) var(formatted_data[3][2][:,s])^0.5]
-    savings_mom_S[:,s] = [mean(formatted_data[4][1][:,s]) var(formatted_data[4][1][:,s])^0.5]
-    x_mom_S[:,s] = [mean(formatted_data[5][1][:,s]) var(formatted_data[5][1][:,s])^0.5]
-
-    y_cov_S[:,s] = [cor(log.(formatted_data[1][1][:,s]),formatted_data[4][1][:,s]) cor(log.(formatted_data[1][1][:,s]),formatted_data[5][1][:,s])]
-    a_cov_S[:,s] = [cor(log.(formatted_data[2][1][:,s]),formatted_data[4][1][:,s]) cor(log.(formatted_data[2][1][:,s]),formatted_data[5][1][:,s])]
-    b_cov_S[:,s] = [cor(log.(formatted_data[3][1][:,s]),formatted_data[4][1][:,s]) cor(log.(formatted_data[3][1][:,s]),formatted_data[5][1][:,s])]
-
-    cov_s_x_S[:,s] = cor(formatted_data[4][1][:,s],formatted_data[5][1][:,s])
-
-  end
-
-  # average moments over S paths
-  # y_moments =  transpose(mean(y_mom_S,2))
-  a_moments = transpose(mean(a_mom_S,2))
-  b_moments = transpose(mean(b_mom_S,2))
-  savings_moments = transpose(mean(savings_mom_S,2))
-  x_moments = transpose(mean(x_mom_S,2))
-
-  y_cov =  transpose(mean(y_cov_S,2))
-  a_cov = transpose(mean(a_cov_S,2))
-  b_cov = transpose(mean(b_cov_S,2))
-
-  cov_s_x = transpose(mean(cov_s_x_S))
+  a_moments = [mean(formatted_data[2][2]) var(formatted_data[2][2])^0.5]
+  b_moments = [mean(formatted_data[3][2]) var(formatted_data[3][2])^0.5]
+  savings_moments = [mean(formatted_data[4][1]) var(formatted_data[4][1])^0.5]
+  x_moments = [mean(formatted_data[5][1]) var(formatted_data[5][1])^0.5]
+  y_cov = [cor(formatted_data[1][1][:,1],formatted_data[4][1][:,1]) cor(formatted_data[1][1][:,1],formatted_data[5][1][:,1])]
+  a_cov = [cor(formatted_data[2][1][:,1],formatted_data[4][1][:,1]) cor(formatted_data[2][1][:,1],formatted_data[5][1][:,1])]
+  b_cov = [cor(formatted_data[3][1][:,1],formatted_data[4][1][:,1]) cor(formatted_data[3][1][:,1],formatted_data[5][1][:,1])]
+  cov_s_x = cor(formatted_data[4][1][:,1],formatted_data[5][1][:,1])
 
   # stack unconditional moments (means, std. devs, state/control covariances, control covariance)
   uncond_moment_stack = 0.
@@ -533,8 +486,8 @@ function moment_gen_dist(formatted_data; restrict_flag=1)
   moments_out = [uncond_moment_stack; cond_moment_stack]
 
   # list of moments
-  moments_desc = ["Mean lna2", "Mean b2", "Mean savings", "Mean x",
-    "Stddev lna2", "Stddev b", "Stddev savings", "Stddev x",
+  moments_desc = ["Mean a2", "Mean b2", "Mean savings", "Mean x",
+    "Stddev a2", "Stddev b", "Stddev savings", "Stddev x",
     "Cor[s,x]",
     "Cor[savings,y]", "Cor[savings,a]", "Cor[savings,b]",
     "Cor[x,y]", "Cor[x,a]", "Cor[x,b]",
