@@ -238,11 +238,11 @@ function sim_choices(initial_states::Array{Float64}, sample_types::Array{Float64
 
   # extract unique initial conditions and types from sample
   initial_states_types_unique = unique(hcat(initial_states, sample_types),1)
-  N_unique = length(initial_states_unique[:,1])
+  N_unique = length(initial_states_types_unique[:,1])
 
   # extract unique initial conditions from sample
-  initial_states_types_unique = unique(initial_states,1)
-  N_unique_states = length(initial_states_types_unique[:,1])
+  initial_states_unique = unique(initial_states,1)
+  N_unique_states = length(initial_states_unique[:,1])
 
   # store household state and decisions
   states_y = Array{Array{Float64}}(2)
@@ -276,12 +276,23 @@ function sim_choices(initial_states::Array{Float64}, sample_types::Array{Float64
   init_type_index = 1
 
   # for each unique initial condition and type, compute choices and assign choices to sample
-  for n_unique in 1:N_unique
+  for n in 1:N_unique_states
+
+    # extract drawn types given initial conditions
+    y_match = find(x->x==initial_states_unique[n,1], initial_states_types_unique[:,1])
+    a_match = find(x->x==initial_states_unique[n,2], initial_states_types_unique[:,2])
+    b_match = find(x->x==initial_states_unique[n,3], initial_states_types_unique[:,3])
+
+    row_match = intersect(y_match, a_match, b_match)
+
+    drawn_types = sort(unique(initial_states_types_unique[row_match,4]))
 
     # initialize choices for endogenous starting values within HH (across types)
     choices0_type = zeros(2)
 
-    for type_index in 1:4
+    for type_index in 1:length(drawn_types)
+
+      type_drawn = Int(drawn_types[type_index])
 
       # start optimization with solution for previous type
       if type_index != 1
@@ -293,13 +304,13 @@ function sim_choices(initial_states::Array{Float64}, sample_types::Array{Float64
       end
 
       # update preferences given type
-      paramsdec.B = type_vec[type_index][1]
-      paramsdec.alphaT1 = type_vec[type_index][2]
+      paramsdec.B = type_vec[type_drawn][1]
+      paramsdec.alphaT1 = type_vec[type_drawn][2]
       paramsdec.alphaT2 = 1. - paramsdec.alphaT1
 
       # solve childhood period decisions
-      V0_type, choices0_type, converged_check, iterations_taken, error_log_state = bellman_optim_child!(initial_states_unique[n_unique,1],
-        initial_states_unique[n_unique,2], initial_states_unique[n_unique,3], paramsdec, paramsshock,
+      V0_type, choices0_type, converged_check, iterations_taken, error_log_state = bellman_optim_child!(initial_states_unique[n,1],
+        initial_states_unique[n,2], initial_states_unique[n,3], paramsdec, paramsshock,
         aprime_start=aprime_start, x_start=x_start, error_log_flag=error_log_flag)
 
       # record errors if prompted
@@ -310,8 +321,8 @@ function sim_choices(initial_states::Array{Float64}, sample_types::Array{Float64
       end
 
       # store decision rules by initial conditions and type
-      choices_lookup_init_type[init_type_index,1:3] = initial_states_unique[n_unique,1:3]
-      choices_lookup_init_type[init_type_index,4] = type_index
+      choices_lookup_init_type[init_type_index,1:3] = initial_states_unique[n,1:3]
+      choices_lookup_init_type[init_type_index,4] = type_drawn
       choices_lookup_init_type[init_type_index,5:6] = choices0_type
 
       # advance index
@@ -321,28 +332,30 @@ function sim_choices(initial_states::Array{Float64}, sample_types::Array{Float64
 
   end
 
+
   # loop through sample and assign decision rules and compute state evolution
-  for n in 1:N
+  for n in 1:N_unique
 
     # extract index of initial conditions and type
-    y_match = find(x->x==initial_states[n,1], choices_lookup_init_type[:,1])
-    a_match = find(x->x==initial_states[n,2], choices_lookup_init_type[:,2])
-    b_match = find(x->x==initial_states[n,3], choices_lookup_init_type[:,3])
-    type_match = find(x->x==sample_types[n], choices_lookup_init_type[:,4])
+    y_match = find(x->x==choices_lookup_init_type[n,1], initial_states[:,1])
+    a_match = find(x->x==choices_lookup_init_type[n,2], initial_states[:,2])
+    b_match = find(x->x==choices_lookup_init_type[n,3], initial_states[:,3])
+    type_match = find(x->x==choices_lookup_init_type[n,4], sample_types)
 
     row_match = intersect(y_match, a_match, b_match, type_match)
 
     # look up decisions given initial conditions and type
-    choices_init_type = choices_lookup_init_type[row_match,5:6]
+    choices_init_type = choices_lookup_init_type[n,5:6]
 
-    choices_savings[1][j,:] = ones(S)*choices_init_type[1] - ones(S)*states_a[1][j,1]*(1+paramsdec.r)
-    choices_x[1][j,:] = ones(S)*choices_init_type[2]
+    # store decisions for this draw
+    choices_savings[1][row_match] = choices_init_type[1] - states_a[1][row_match]*(1+paramsdec.r)
+    choices_x[1][row_match] = choices_init_type[2]
 
-    # calculate terminal period states given shocks conditional on type
-    for s in 1:S
-      states_y[2][j,s] = Y_evol(states_y[1][j,s], paramsdec.rho_y, shocks_y[j,s])
-      states_a[2][j,s] = choices_savings[1][j,s] + states_a[1][j,s]*(1+paramsdec.r)
-      states_b[2][j,s] = HC_prod(states_b[1][j,s], choices_x[1][j,s], shocks_b[j,s],
+    # calculate terminal period states given shocks
+    for match_index in 1:length(row_match)
+      states_y[2][row_match[match_index]] = Y_evol(states_y[1][row_match[match_index]], paramsdec.rho_y, shocks_y[row_match[match_index]])
+      states_a[2][row_match[match_index]] = choices_savings[1][row_match[match_index]] + states_a[1][row_match[match_index]]*(1+paramsdec.r)
+      states_b[2][row_match[match_index]] = HC_prod(states_b[1][row_match[match_index]], choices_x[1][row_match[match_index]], shocks_b[row_match[match_index]],
         paramsdec.iota0[1], paramsdec.iota1[1], paramsdec.iota2[1], paramsdec.iota3[1])
     end
 
@@ -356,7 +369,7 @@ end
 
 function sim_choices(sim_choices_arg::SimChoiceArg)
 
-   sim_choices(sim_choices_arg.initial_states, sim_choices.arg.sample_N_M, sim_choices_arg.shocks_y, sim_choices_arg.shocks_b,
+   sim_choices(sim_choices_arg.initial_states, sim_choices.arg.sample_types, sim_choices_arg.shocks_y, sim_choices_arg.shocks_b,
     sim_choices_arg.paramsprefs, sim_choices_arg.paramsdec, sim_choices_arg.paramsshock, error_log_flag=sim_choices_arg.error_log_flag)
 
 end
@@ -367,11 +380,8 @@ end
 
 function moment_gen_dist(formatted_data; restrict_flag=1)
 
-  # extract S given data
-  S = length(formatted_data[1][1][1,:])
-
   # extract NxM given data
-  N_M = length(formatted_data[1][1][:,1])
+  N = length(formatted_data[1][1][:,1])
 
   ## Unconditional Moments
 
@@ -381,10 +391,10 @@ function moment_gen_dist(formatted_data; restrict_flag=1)
   b_moments = [mean(formatted_data[3][2]) var(formatted_data[3][2])^0.5]
   savings_moments = [mean(formatted_data[4][1]) var(formatted_data[4][1])^0.5]
   x_moments = [mean(formatted_data[5][1]) var(formatted_data[5][1])^0.5]
-  y_cov = [cor(formatted_data[1][1][:,1],formatted_data[4][1][:,1]) cor(formatted_data[1][1][:,1],formatted_data[5][1][:,1])]
-  a_cov = [cor(formatted_data[2][1][:,1],formatted_data[4][1][:,1]) cor(formatted_data[2][1][:,1],formatted_data[5][1][:,1])]
-  b_cov = [cor(formatted_data[3][1][:,1],formatted_data[4][1][:,1]) cor(formatted_data[3][1][:,1],formatted_data[5][1][:,1])]
-  cov_s_x = cor(formatted_data[4][1][:,1],formatted_data[5][1][:,1])
+  y_cov = [cor(formatted_data[1][1],formatted_data[4][1]) cor(formatted_data[1][1],formatted_data[5][1])]
+  a_cov = [cor(formatted_data[2][1],formatted_data[4][1]) cor(formatted_data[2][1],formatted_data[5][1])]
+  b_cov = [cor(formatted_data[3][1],formatted_data[4][1]) cor(formatted_data[3][1],formatted_data[5][1])]
+  cov_s_x = cor(formatted_data[4][1],formatted_data[5][1])
 
   # stack unconditional moments (means, std. devs, state/control covariances, control covariance)
   uncond_moment_stack = 0.
@@ -410,9 +420,9 @@ function moment_gen_dist(formatted_data; restrict_flag=1)
   ## Moments Conditional on Initial States (does not vary with shocks, so ignore S paths)
 
   # compute quantiles of initial states
-  y_quantiles = quantile(formatted_data[1][1][:,1], [0.25,0.5,0.75])
-  a_quantiles = quantile(formatted_data[2][1][:,1], [0.25,0.5,0.75])
-  b_quantiles = quantile(formatted_data[3][1][:,1], [0.25,0.5,0.75])
+  y_quantiles = quantile(formatted_data[1][1], [0.25,0.5,0.75])
+  a_quantiles = quantile(formatted_data[2][1], [0.25,0.5,0.75])
+  b_quantiles = quantile(formatted_data[3][1], [0.25,0.5,0.75])
 
   # initialize average conditional choices, conditioning on quantiles of initial state
   savings_cond_y = zeros(4)
@@ -423,37 +433,37 @@ function moment_gen_dist(formatted_data; restrict_flag=1)
   x_cond_b = zeros(4)
 
   # compute moments conditional on quantiles of initial income
-  savings_cond_y[1] = mean(formatted_data[4][1][formatted_data[1][1][:,1].<y_quantiles[1],1])
-  savings_cond_y[2] = mean(formatted_data[4][1][(formatted_data[1][1][:,1].>=y_quantiles[1])&(formatted_data[1][1][:,1].<y_quantiles[2]),1])
-  savings_cond_y[3] = mean(formatted_data[4][1][(formatted_data[1][1][:,1].>=y_quantiles[2])&(formatted_data[1][1][:,1].<y_quantiles[3]),1])
-  savings_cond_y[4] = mean(formatted_data[4][1][(formatted_data[1][1][:,1].>=y_quantiles[3]),1])
+  savings_cond_y[1] = mean(formatted_data[4][1][formatted_data[1][1].<y_quantiles[1],1])
+  savings_cond_y[2] = mean(formatted_data[4][1][(formatted_data[1][1].>=y_quantiles[1])&(formatted_data[1][1].<y_quantiles[2]),1])
+  savings_cond_y[3] = mean(formatted_data[4][1][(formatted_data[1][1].>=y_quantiles[2])&(formatted_data[1][1].<y_quantiles[3]),1])
+  savings_cond_y[4] = mean(formatted_data[4][1][(formatted_data[1][1].>=y_quantiles[3]),1])
 
-  x_cond_y[1] = mean(formatted_data[5][1][formatted_data[1][1][:,1].<y_quantiles[1],1])
-  x_cond_y[2] = mean(formatted_data[5][1][(formatted_data[1][1][:,1].>=y_quantiles[1])&(formatted_data[1][1][:,1].<y_quantiles[2]),1])
-  x_cond_y[3] = mean(formatted_data[5][1][(formatted_data[1][1][:,1].>=y_quantiles[2])&(formatted_data[1][1][:,1].<y_quantiles[3]),1])
-  x_cond_y[4] = mean(formatted_data[5][1][(formatted_data[1][1][:,1].>=y_quantiles[3]),1])
+  x_cond_y[1] = mean(formatted_data[5][1][formatted_data[1][1].<y_quantiles[1],1])
+  x_cond_y[2] = mean(formatted_data[5][1][(formatted_data[1][1].>=y_quantiles[1])&(formatted_data[1][1].<y_quantiles[2]),1])
+  x_cond_y[3] = mean(formatted_data[5][1][(formatted_data[1][1].>=y_quantiles[2])&(formatted_data[1][1].<y_quantiles[3]),1])
+  x_cond_y[4] = mean(formatted_data[5][1][(formatted_data[1][1].>=y_quantiles[3]),1])
 
   # compute moments conditional on quantiles of initial assets
-  savings_cond_a[1] = mean(formatted_data[4][1][formatted_data[2][1][:,1].<a_quantiles[1],1])
-  savings_cond_a[2] = mean(formatted_data[4][1][(formatted_data[2][1][:,1].>=a_quantiles[1])&(formatted_data[2][1][:,1].<a_quantiles[2]),1])
-  savings_cond_a[3] = mean(formatted_data[4][1][(formatted_data[2][1][:,1].>=a_quantiles[2])&(formatted_data[2][1][:,1].<a_quantiles[3]),1])
-  savings_cond_a[4] = mean(formatted_data[4][1][(formatted_data[2][1][:,1].>=a_quantiles[3]),1])
+  savings_cond_a[1] = mean(formatted_data[4][1][formatted_data[2][1].<a_quantiles[1],1])
+  savings_cond_a[2] = mean(formatted_data[4][1][(formatted_data[2][1].>=a_quantiles[1])&(formatted_data[2][1].<a_quantiles[2]),1])
+  savings_cond_a[3] = mean(formatted_data[4][1][(formatted_data[2][1].>=a_quantiles[2])&(formatted_data[2][1].<a_quantiles[3]),1])
+  savings_cond_a[4] = mean(formatted_data[4][1][(formatted_data[2][1].>=a_quantiles[3]),1])
 
-  x_cond_a[1] = mean(formatted_data[5][1][formatted_data[2][1][:,1].<a_quantiles[1],1])
-  x_cond_a[2] = mean(formatted_data[5][1][(formatted_data[2][1][:,1].>=a_quantiles[1])&(formatted_data[2][1][:,1].<a_quantiles[2]),1])
-  x_cond_a[3] = mean(formatted_data[5][1][(formatted_data[2][1][:,1].>=a_quantiles[2])&(formatted_data[2][1][:,1].<a_quantiles[3]),1])
-  x_cond_a[4] = mean(formatted_data[5][1][(formatted_data[2][1][:,1].>=a_quantiles[3]),1])
+  x_cond_a[1] = mean(formatted_data[5][1][formatted_data[2][1].<a_quantiles[1],1])
+  x_cond_a[2] = mean(formatted_data[5][1][(formatted_data[2][1].>=a_quantiles[1])&(formatted_data[2][1].<a_quantiles[2]),1])
+  x_cond_a[3] = mean(formatted_data[5][1][(formatted_data[2][1].>=a_quantiles[2])&(formatted_data[2][1].<a_quantiles[3]),1])
+  x_cond_a[4] = mean(formatted_data[5][1][(formatted_data[2][1].>=a_quantiles[3]),1])
 
   # compute moments conditional on quantiles of initial HC
-  savings_cond_b[1] = mean(formatted_data[4][1][formatted_data[3][1][:,1].<b_quantiles[1],1])
-  savings_cond_b[2] = mean(formatted_data[4][1][(formatted_data[3][1][:,1].>=b_quantiles[1])&(formatted_data[3][1][:,1].<b_quantiles[2]),1])
-  savings_cond_b[3] = mean(formatted_data[4][1][(formatted_data[3][1][:,1].>=b_quantiles[2])&(formatted_data[3][1][:,1].<b_quantiles[3]),1])
-  savings_cond_b[4] = mean(formatted_data[4][1][(formatted_data[3][1][:,1].>=b_quantiles[3]),1])
+  savings_cond_b[1] = mean(formatted_data[4][1][formatted_data[3][1].<b_quantiles[1],1])
+  savings_cond_b[2] = mean(formatted_data[4][1][(formatted_data[3][1].>=b_quantiles[1])&(formatted_data[3][1].<b_quantiles[2]),1])
+  savings_cond_b[3] = mean(formatted_data[4][1][(formatted_data[3][1].>=b_quantiles[2])&(formatted_data[3][1].<b_quantiles[3]),1])
+  savings_cond_b[4] = mean(formatted_data[4][1][(formatted_data[3][1].>=b_quantiles[3]),1])
 
-  x_cond_b[1] = mean(formatted_data[5][1][formatted_data[3][1][:,1].<b_quantiles[1],1])
-  x_cond_b[2] = mean(formatted_data[5][1][(formatted_data[3][1][:,1].>=b_quantiles[1])&(formatted_data[3][1][:,1].<b_quantiles[2]),1])
-  x_cond_b[3] = mean(formatted_data[5][1][(formatted_data[3][1][:,1].>=b_quantiles[2])&(formatted_data[3][1][:,1].<b_quantiles[3]),1])
-  x_cond_b[4] = mean(formatted_data[5][1][(formatted_data[3][1][:,1].>=b_quantiles[3]),1])
+  x_cond_b[1] = mean(formatted_data[5][1][formatted_data[3][1].<b_quantiles[1],1])
+  x_cond_b[2] = mean(formatted_data[5][1][(formatted_data[3][1].>=b_quantiles[1])&(formatted_data[3][1].<b_quantiles[2]),1])
+  x_cond_b[3] = mean(formatted_data[5][1][(formatted_data[3][1].>=b_quantiles[2])&(formatted_data[3][1].<b_quantiles[3]),1])
+  x_cond_b[4] = mean(formatted_data[5][1][(formatted_data[3][1].>=b_quantiles[3]),1])
 
   # stack conditional moments (by conditional quantile: savings conditional on quantile of each state, then investment conditional on quantile of each state)
   cond_moment_stack = 0
