@@ -3,7 +3,7 @@
 using DataFrames
 using Sobol
 # using LatexPrint
-# using PyPlot
+using PyPlot
 
 println("estimation utilities loading")
 
@@ -90,13 +90,12 @@ end
 #= DGP Simulation and Moment Generation =#
 
 function dgp_moments(initial_state_data, paramsprefs::ParametersPrefs, paramsdec::ParametersDec, paramsshock::ParametersShock;
-  T=2, seed=1234, S=10, N=100, sample_code="nodraw", restrict_flag=1, error_log_flag=0)
+  seed=1234, N=1000, restrict_flag=1, error_log_flag=0)
 
   # simulate dataset
-  sim_shocks = sim_paths(initial_state_data, paramsshock,
-          T=T, seed=seed, N=N, S=S, sample_code=sample_code)
+  sim_shocks = sim_paths(initial_state_data, paramsshock, paramsprefs, seed=seed, N=N)
 
-  sim_data = sim_choices(sim_shocks[1], sim_shocks[2][1], sim_shocks[3][1],
+  sim_data = sim_choices(sim_shocks[1], sim_shocks[2], sim_shocks[3], sim_shocks[4],
     paramsprefs, paramsdec, paramsshock, error_log_flag=error_log_flag)
 
   # calculate simulated data moments
@@ -109,14 +108,14 @@ end
 # parallelize choices
 
 function dgp_moments_par(initial_state_data, paramsprefs::ParametersPrefs, paramsdec::ParametersDec, paramsshock::ParametersShock;
-  T=2, seed=1234, S=10, N=100, sample_code="nodraw", restrict_flag=1, par_N=2, error_log_flag=0)
+  seed=1234, N=1000, restrict_flag=1, par_N=2, error_log_flag=0)
 
   # simulate dataset
-  sim_shocks = sim_paths(initial_state_data, paramsshock,
-          T=T, seed=seed, N=N, S=S, sample_code=sample_code)
+  sim_shocks = sim_paths(initial_state_data, paramsshock, paramsprefs, seed=seed, N=N)
 
   # split dataset and create objects that can be read by choice simulator
-  split_sim_choice_arg = sim_paths_split(sim_shocks[1], sim_shocks[2][1], sim_shocks[3][1], paramsprefs, paramsdec, paramsshock, par_N=par_N)
+  split_sim_choice_arg = sim_paths_split(sim_shocks[1], sim_shocks[2], sim_shocks[3], sim_shocks[4],
+   paramsprefs, paramsdec, paramsshock, par_N=par_N, error_log_flag=error_log_flag)
 
   # parallel compute choices
   sim_choices_par = pmap(sim_choices, split_sim_choice_arg)
@@ -185,9 +184,9 @@ function smm(data_formatted, paramsprefs::ParametersPrefs, paramsdec::Parameters
   gamma_a1_start=1., gamma_a2_start=1., gamma_a3_start=1., gamma_a4_start=1.,
   gamma_b1_start=1., gamma_b2_start=1., gamma_b3_start=1., gamma_b4_start=1.,
   eps_b_var_start=0.022, iota0_start=1.87, iota1_start=0.42, iota2_start=0.06, iota3_start=0.0,
-  N=100, T=2, S=100,
-  opt_code="neldermead", sample_code="nodraw", restrict_flag=1, seed=1234, error_log_flag=0,
-  opt_trace=false, opt_iter=1000, print_flag=true, opt_tol=1e-9, par_flag=0, par_N=4)
+  N=1000,
+  opt_code="neldermead", restrict_flag=1, seed=1234, error_log_flag=0,
+  opt_trace=false, opt_iter=1000, print_flag=false, opt_tol=1e-9, par_flag=0, par_N=4)
 
   # generate data moments
   data_moments = moment_gen_dist(data_formatted, restrict_flag=restrict_flag)
@@ -197,7 +196,7 @@ function smm(data_formatted, paramsprefs::ParametersPrefs, paramsdec::Parameters
 
   for m in 1:length(data_moments[1])
      if data_moments[1][m] != 0.
-       W[m,m] = 1/abs(data_moments[1][m])^2
+       W[m,m] = 1/abs(data_moments[1][m])
     end
   end
 
@@ -209,7 +208,7 @@ function smm(data_formatted, paramsprefs::ParametersPrefs, paramsdec::Parameters
   # define objective function given data moments
   smm_obj_inner(param_vec) = smm_obj(data_formatted, data_moments, W, param_vec,
     paramsprefs_float, paramsdec_float, paramsshock_float,
-    N=N, T=T, restrict_flag=restrict_flag, S=S, seed=seed, sample_code=sample_code, error_log_flag=error_log_flag,
+    N=N, restrict_flag=restrict_flag, seed=seed, error_log_flag=error_log_flag,
     print_flag=print_flag, par_flag=par_flag, par_N=par_N)
 
   # minimize objective
@@ -243,14 +242,17 @@ end
 
 function smm_sobol(data_formatted, paramsprefs::ParametersPrefs, paramsdec::ParametersDec, paramsshock::ParametersShock;
    sobol_N=10,
-   B_hi_lb=1., B_hi_ub=10., B_lo_lb=1., B_lo_ub=5.,
-   alphaT1_hi_lb=0.5, alphaT1_hi_ub=0.99, alphaT1_lo_lb=0.01, alphaT1_lo_ub=0.25,
+   B_hi_lb=1., B_hi_ub=10., B_lo_lb=1., B_lo_ub=10.,
+   alphaT1_hi_lb=0.01, alphaT1_hi_ub=0.99, alphaT1_lo_lb=0.01, alphaT1_lo_ub=0.99,
    gamma_y2_lb=1., gamma_y2_ub=2., gamma_y3_lb=1., gamma_y3_ub=2., gamma_y4_lb=1., gamma_y4_ub=2.,
    gamma_a1_lb=1., gamma_a1_ub=2., gamma_a2_lb=1., gamma_a2_ub=2., gamma_a3_lb=1., gamma_a3_ub=2., gamma_a4_lb=1., gamma_a4_ub=2.,
    gamma_b1_lb=1., gamma_b1_ub=2., gamma_b2_lb=1., gamma_b2_ub=2., gamma_b3_lb=1., gamma_b3_ub=2., gamma_b4_lb=1., gamma_b4_ub=2.,
    eps_b_var_lb=0.0001, eps_b_var_ub=0.1, iota0_lb=-2., iota0_ub=2., iota1_lb=0.0001, iota1_ub=2., iota2_lb=0.0001, iota2_ub=1., iota3_lb=-2., iota3_ub=2.,
-   N=100, T=2, S=100, sample_code="nodraw", restrict_flag=1, seed=1234, error_log_flag=0, print_flag=false,
+   N=1000, restrict_flag=1, seed=1234, error_log_flag=0, print_flag=false,
    par_flag=0, par_N=4)
+
+   # initialize storage of parameter vectors and moments
+   sobol_storage = Any[]
 
    # generate data moments
    data_moments = moment_gen_dist(data_formatted, restrict_flag=restrict_flag)
@@ -260,7 +262,7 @@ function smm_sobol(data_formatted, paramsprefs::ParametersPrefs, paramsdec::Para
 
    for m in 1:length(data_moments[1])
       if data_moments[1][m] != 0.
-        W[m,m] = 1/abs(data_moments[1][m])^2
+        W[m,m] = 1/abs(data_moments[1][m])
      end
    end
 
@@ -286,7 +288,12 @@ function smm_sobol(data_formatted, paramsprefs::ParametersPrefs, paramsdec::Para
    # loop through Sobol sequence and compute objective function (skip if constraints are violated or B or alphaT1 ordering is violated)
    for i in 1:sobol_N
 
+      # initialize row of Sobol storage
+      sobol_storage_i = zeros(59)
+
       param_sobol = next(s)
+
+      sobol_storage_i[1:20] = param_sobol
 
       println(string("Iter ",i," of ",sobol_N,": ",param_sobol))
 
@@ -294,10 +301,17 @@ function smm_sobol(data_formatted, paramsprefs::ParametersPrefs, paramsdec::Para
          param_sobol[4] <= 0. || param_sobol[4] >= 1. || param_sobol[16] <= 0. ||
          param_sobol[1] < param_sobol[2] || param_sobol[3] < param_sobol[4]
          obj_val = Inf
+         println("skipped")
+
+         sobol_storage_i[21:59] = fill(Inf,39)
+
       else
-         obj_val = smm_obj(data_formatted, data_moments, W, param_sobol, paramsprefs_float, paramsdec_float, paramsshock_float,
-            N=N, T=T, restrict_flag=restrict_flag, S=S, seed=seed, sample_code=sample_code, error_log_flag=error_log_flag, print_flag=print_flag,
+         obj_val, moments = smm_obj_moments(data_formatted, data_moments, W, param_sobol, paramsprefs_float, paramsdec_float, paramsshock_float,
+            N=N, restrict_flag=restrict_flag, seed=seed, error_log_flag=error_log_flag, print_flag=print_flag,
             par_flag=par_flag, par_N=par_N)
+
+         sobol_storage_i[21:59] = moments
+
       end
 
       if obj_val < min_obj_val
@@ -305,11 +319,14 @@ function smm_sobol(data_formatted, paramsprefs::ParametersPrefs, paramsdec::Para
          min_obj_params = param_sobol
       end
 
+      # append moments and parameter vector to storage
+      push!(sobol_storage, sobol_storage_i)
+
       # println(string("Min Value: ",min_obj_val," Minimizer: ",min_obj_params))
 
    end
 
-  return min_obj_val, min_obj_params
+  return min_obj_val, min_obj_params, sobol_storage
 
 end
 
@@ -323,8 +340,8 @@ function smm_write_results(path, data_formatted, paramsprefs::ParametersPrefs, p
    gamma_a1_start=1., gamma_a2_start=1., gamma_a3_start=1., gamma_a4_start=1.,
    gamma_b1_start=1., gamma_b2_start=1., gamma_b3_start=1., gamma_b4_start=1.,
    eps_b_var_start=0.022, iota0_start=1.87, iota1_start=0.42, iota2_start=0.06, iota3_start=0.0,
-  N=100, T=2, S=100,
-  opt_code="neldermead", sample_code="nodraw", restrict_flag=1, seed=1234, error_log_flag=0,
+  N=1000,
+  opt_code="neldermead", restrict_flag=1, seed=1234, error_log_flag=0,
   opt_trace=false, opt_iter=1000, opt_tol=1e-9, print_flag=false, par_flag=0, par_N=4)
 
    # run SMM
@@ -335,7 +352,7 @@ function smm_write_results(path, data_formatted, paramsprefs::ParametersPrefs, p
       gamma_b1_start=gamma_b1_start, gamma_b2_start=gamma_b2_start, gamma_b3_start=gamma_b3_start, gamma_b4_start=gamma_b4_start,
       eps_b_var_start=eps_b_var_start,
       iota0_start=iota0_start, iota1_start=iota1_start, iota2_start=iota2_start, iota3_start=iota3_start,
-      N=N, T=T, S=S, opt_code=opt_code, sample_code=sample_code, restrict_flag=restrict_flag, seed=seed,
+      N=N, opt_code=opt_code, restrict_flag=restrict_flag, seed=seed,
       error_log_flag=error_log_flag, opt_trace=opt_trace, opt_iter=opt_iter, opt_tol=opt_tol, print_flag=print_flag,
       par_flag=par_flag, par_N=par_N)
 
@@ -344,15 +361,15 @@ function smm_write_results(path, data_formatted, paramsprefs::ParametersPrefs, p
 
 end
 
-function smm_sobol_write_results(path, data_formatted, paramsprefs::ParametersPrefs, paramsdec::ParametersDec, paramsshock::ParametersShock;
+function smm_sobol_write_results(path_min, path_store, data_formatted, paramsprefs::ParametersPrefs, paramsdec::ParametersDec, paramsshock::ParametersShock;
    sobol_N=10,
-   B_hi_lb=1., B_hi_ub=10., B_lo_lb=1., B_lo_ub=5.,
-   alphaT1_hi_lb=0.5, alphaT1_hi_ub=0.99, alphaT1_lo_lb=0.01, alphaT1_lo_ub=0.25,
+   B_hi_lb=1., B_hi_ub=10., B_lo_lb=1., B_lo_ub=10.,
+   alphaT1_hi_lb=0.01, alphaT1_hi_ub=0.99, alphaT1_lo_lb=0.01, alphaT1_lo_ub=0.99,
    gamma_y2_lb=1., gamma_y2_ub=2., gamma_y3_lb=1., gamma_y3_ub=2., gamma_y4_lb=1., gamma_y4_ub=2.,
    gamma_a1_lb=1., gamma_a1_ub=2., gamma_a2_lb=1., gamma_a2_ub=2., gamma_a3_lb=1., gamma_a3_ub=2., gamma_a4_lb=1., gamma_a4_ub=2.,
    gamma_b1_lb=1., gamma_b1_ub=2., gamma_b2_lb=1., gamma_b2_ub=2., gamma_b3_lb=1., gamma_b3_ub=2., gamma_b4_lb=1., gamma_b4_ub=2.,
    eps_b_var_lb=0.0001, eps_b_var_ub=0.1, iota0_lb=-2., iota0_ub=2., iota1_lb=0.0001, iota1_ub=2., iota2_lb=0.0001, iota2_ub=1., iota3_lb=-2., iota3_ub=2.,
-   N=100, T=2, S=100, sample_code="nodraw", restrict_flag=1, seed=1234, error_log_flag=0, print_flag=false,
+   N=1000, restrict_flag=1, seed=1234, error_log_flag=0, print_flag=false,
    par_flag=0, par_N=4)
 
   # run SMM
@@ -368,21 +385,24 @@ function smm_sobol_write_results(path, data_formatted, paramsprefs::ParametersPr
       gamma_a1_ub=gamma_a1_ub, gamma_a2_ub=gamma_a2_ub, gamma_a3_ub=gamma_a3_ub, gamma_a4_ub=gamma_a4_ub,
       gamma_b1_ub=gamma_b1_ub, gamma_b2_ub=gamma_b2_ub, gamma_b3_ub=gamma_b3_ub, gamma_b4_ub=gamma_b4_ub,
       eps_b_var_ub=eps_b_var_ub, iota0_ub=iota0_ub, iota1_ub=iota1_ub, iota2_ub=iota2_ub, iota3_ub=iota3_ub,
-      N=N, T=T, S=S, sample_code=sample_code, restrict_flag=restrict_flag, seed=seed,
+      N=N, restrict_flag=restrict_flag, seed=seed,
       error_log_flag=error_log_flag, print_flag=print_flag, par_flag=par_flag, par_N=par_N)
 
-   # write to text file
-   writedlm(path, transpose([estimation_time; estimation_result[1]; estimation_result[2]]), ", ")
+   # write minimizer to text file
+   writedlm(path_min, transpose([estimation_time; estimation_result[1]; estimation_result[2]]), ", ")
+
+   # write full list of moments and parameters in sequence to text file
+   writecsv(path_store, estimation_result[3])
 
 end
 
 ## Objecive Function for SMM Optimization, modifies parameters in place and takes target moments as argument
 
-# jointly estimate all parameters
+# jointly estimate all parameters, returning both objective function and simulated moments
 
-function smm_obj(initial_state_data, target_moments, W::Array, param_vec::Array,
+function smm_obj_moments(initial_state_data, target_moments, W::Array, param_vec::Array,
   paramsprefs::ParametersPrefs, paramsdec::ParametersDec, paramsshock::ParametersShock;
-  N=1000, T=2, restrict_flag=1, S=100, seed=1234, sample_code="nodraw", error_log_flag=0,
+  N=1000, restrict_flag=1, seed=1234, error_log_flag=0,
   print_flag=false, par_flag=0, par_N=4)
 
   if print_flag == true
@@ -405,10 +425,10 @@ function smm_obj(initial_state_data, target_moments, W::Array, param_vec::Array,
     # simulate dataset and compute moments, whether serial or parallel
     if par_flag == 0
        sim_moments, error_log = dgp_moments(initial_state_data, paramsprefs, paramsdec, paramsshock,
-         T=T, seed=seed, S=S, N=N, sample_code=sample_code, restrict_flag=restrict_flag, error_log_flag=error_log_flag)
+         seed=seed, N=N, restrict_flag=restrict_flag, error_log_flag=error_log_flag)
    elseif par_flag == 1
       sim_moments, error_log = dgp_moments_par(initial_state_data, paramsprefs, paramsdec, paramsshock,
-        T=T, seed=seed, S=S, N=N, sample_code=sample_code, restrict_flag=restrict_flag, par_N=par_N, error_log_flag=error_log_flag)
+        seed=seed, N=N, restrict_flag=restrict_flag, par_N=par_N, error_log_flag=error_log_flag)
    else
       throw(error("par_flag must be 0 or 1"))
    end
@@ -422,7 +442,21 @@ function smm_obj(initial_state_data, target_moments, W::Array, param_vec::Array,
     println(obj)
   end
 
-  return obj
+  return obj, sim_moments[1]
+
+end
+
+# return only objectie function
+
+function smm_obj(initial_state_data, target_moments, W::Array, param_vec::Array,
+  paramsprefs::ParametersPrefs, paramsdec::ParametersDec, paramsshock::ParametersShock;
+  N=1000, restrict_flag=1, seed=1234, error_log_flag=0,
+  print_flag=false, par_flag=0, par_N=4)
+
+  obj = smm_obj_moments(initial_state_data, target_moments, W, param_vec, paramsprefs, paramsdec, paramsshock,
+   N=N, restrict_flag=restrict_flag, seed=seed, error_log_flag=error_log_flag, print_flag=print_flag, par_flag=par_flag, par_N=par_N)[1]
+
+   return obj
 
 end
 
@@ -432,7 +466,7 @@ end
 
 function smm_obj_testing(data_formatted, param_vec::Array,
   paramsprefs::ParametersPrefs, paramsdec::ParametersDec, paramsshock::ParametersShock;
-  N=1000, T=2, restrict_flag=1, S=100, seed=1234, sample_code="nodraw", error_log_flag=0,
+  N=1000, restrict_flag=1, seed=1234, error_log_flag=0,
   par_flag=0, par_N=4)
 
   # generate data moments
@@ -443,7 +477,7 @@ function smm_obj_testing(data_formatted, param_vec::Array,
 
   for m in 1:length(data_moments[1])
      if data_moments[1][m] != 0.
-       W[m,m] = 1/abs(data_moments[1][m])^2
+       W[m,m] = 1/abs(data_moments[1][m])
     end
   end
 
@@ -470,10 +504,10 @@ function smm_obj_testing(data_formatted, param_vec::Array,
      # simulate dataset and compute moments, whether serial or parallel
       if par_flag == 0
          sim_moments, error_log = dgp_moments(data_formatted, paramsprefs_float, paramsdec_float, paramsshock_float,
-         T=T, seed=seed, S=S, N=N, sample_code=sample_code, restrict_flag=restrict_flag, error_log_flag=error_log_flag)
+         seed=seed, N=N, restrict_flag=restrict_flag, error_log_flag=error_log_flag)
       elseif par_flag == 1
          sim_moments, error_log = dgp_moments_par(data_formatted, paramsprefs_float, paramsdec_float, paramsshock_float,
-         T=T, seed=seed, S=S, N=N, sample_code=sample_code, restrict_flag=restrict_flag, par_N=par_N, error_log_flag=error_log_flag)
+         seed=seed, N=N, restrict_flag=restrict_flag, par_N=par_N, error_log_flag=error_log_flag)
       else
          throw(error("par_flag must be 0 or 1"))
       end
@@ -539,11 +573,11 @@ function plot_moments(param_grid, stored_moments, param_name; moment_display_fla
   N = length(param_grid)
 
   # initialize moment arrays
-  lna2_mean = zeros(N)
+  a2_mean = zeros(N)
   b2_mean = zeros(N)
   s_mean = zeros(N)
   x_mean = zeros(N)
-  lna2_sd = zeros(N)
+  a2_sd = zeros(N)
   b2_sd = zeros(N)
   s_sd = zeros(N)
   x_sd = zeros(N)
@@ -584,11 +618,11 @@ function plot_moments(param_grid, stored_moments, param_name; moment_display_fla
 
   # fill moment arrays
   for n in 1:N
-     lna2_mean[n] = stored_moments[n][1]
+     a2_mean[n] = stored_moments[n][1]
      b2_mean[n] = stored_moments[n][2]
      s_mean[n] = stored_moments[n][3]
      x_mean[n] = stored_moments[n][4]
-     lna2_sd[n] = stored_moments[n][5]
+     a2_sd[n] = stored_moments[n][5]
      b2_sd[n] = stored_moments[n][6]
      s_sd[n] = stored_moments[n][7]
      x_sd[n] = stored_moments[n][8]
@@ -632,13 +666,13 @@ function plot_moments(param_grid, stored_moments, param_name; moment_display_fla
 
   if moment_display_flag == 1
      # mean graphs
-     plot_series(param_grid, lna2_mean, param_name, "Mean log(a2)")
+     plot_series(param_grid, a2_mean, param_name, "Mean a2")
      plot_series(param_grid, b2_mean, param_name, "Mean b2")
      plot_series(param_grid, s_mean, param_name, "Mean savings")
      plot_series(param_grid, x_mean, param_name, "Mean investment")
 
      # std dev graphs
-     plot_series(param_grid, lna2_sd, param_name, "Std. Dev. log(a2)")
+     plot_series(param_grid, a2_sd, param_name, "Std. Dev. a2")
      plot_series(param_grid, b2_sd, param_name, "Std. Dev. b2")
      plot_series(param_grid, s_sd, param_name, "Std. Dev. savings")
      plot_series(param_grid, x_sd, param_name, "Std. Dev. investment")
@@ -650,12 +684,12 @@ function plot_moments(param_grid, stored_moments, param_name; moment_display_fla
 
   if moment_display_flag == 2
      # corr of state and control
-     plot_series(param_grid, cov_y1_s, param_name, "Cov(savings, log(y1))")
-     plot_series(param_grid, cov_a1_s, param_name, "Cov(savings, log(a1))")
-     plot_series(param_grid, cov_b1_s, param_name, "Cov(savings, b1)")
-     plot_series(param_grid, cov_y1_x, param_name, "Cov(investment, log(y1))")
-     plot_series(param_grid, cov_a1_x, param_name, "Cov(investment, log(a1))")
-     plot_series(param_grid, cov_b1_x, param_name, "Cov(investment, b1)")
+     plot_series(param_grid, cor_y1_s, param_name, "Cor(savings, y1)")
+     plot_series(param_grid, cor_a1_s, param_name, "Cor(savings, a1)")
+     plot_series(param_grid, cor_b1_s, param_name, "Cor(savings, b1)")
+     plot_series(param_grid, cor_y1_x, param_name, "Cor(investment, y1)")
+     plot_series(param_grid, cor_a1_x, param_name, "Cor(investment, a1)")
+     plot_series(param_grid, cor_b1_x, param_name, "Cor(investment, b1)")
   end
 
   if moment_display_flag == 3
@@ -694,10 +728,10 @@ end
 
 ## Parameter Specific Code
 
-function vary_B_hi(initial_state_data, param_vec::Array,
+function vary_param(param_name::String, initial_state_data, param_vec::Array,
   paramsprefs::ParametersPrefs, paramsshock::ParametersShock, paramsdec::ParametersDec,
   param_lower::Float64, param_upper::Float64, param_N::Int64;
-  N=1000, T=2, restrict_flag=1, S=100, seed=1234, sample_code="nodraw", par_flag=0, par_N=2)
+  N=1000, restrict_flag=1, seed=1234, par_flag=0, par_N=2, error_log_flag=0)
 
   # create parameter grid
   param_grid = linspace(param_lower, param_upper, param_N)
@@ -719,8 +753,50 @@ function vary_B_hi(initial_state_data, param_vec::Array,
 
   # for each parameter guess, solve model and calculate full set of moments and store
   for n in 1:param_N
-    println(string("Iter ",n," of ",param_N,": ",param_grid[n]))
-    paramsprefs_float.B_hi = param_grid[n]
+   println(string("Iter ",n," of ",param_N,": ",param_grid[n]))
+   if param_name == "B_hi"
+      paramsprefs_float.B_hi = param_grid[n]
+   elseif param_name == "B_lo"
+      paramsprefs_float.B_lo = param_grid[n]
+   elseif param_name == "alphaT1_hi"
+      paramsprefs_float.alphaT1_hi = param_grid[n]
+   elseif param_name == "alphaT1_lo"
+      paramsprefs_float.alphaT1_hi = param_grid[n]
+   elseif param_name == "eps_b_var"
+      paramsshock_float.eps_b_var = param_grid[n]
+   elseif param_name == "iota0"
+      paramsdec_float.iota0 = param_grid[n]
+   elseif param_name == "iota1"
+      paramsdec_float.iota1 = param_grid[n]
+   elseif param_name == "iota2"
+      paramsdec_float.iota2 = param_grid[n]
+   elseif param_name == "iota3"
+      paramsdec_float.iota3 = param_grid[n]
+   elseif param_name == "gamma_y2"
+      paramsprefs_float.gamma_y[2] = param_grid[n]
+   elseif param_name == "gamma_y3"
+      paramsprefs_float.gamma_y[3] = param_grid[n]
+   elseif param_name == "gamma_y4"
+      paramsprefs_float.gamma_y[4] = param_grid[n]
+   elseif param_name == "gamma_a1"
+      paramsprefs_float.gamma_a[1] = param_grid[n]
+   elseif param_name == "gamma_a2"
+      paramsprefs_float.gamma_a[2] = param_grid[n]
+   elseif param_name == "gamma_a3"
+      paramsprefs_float.gamma_a[3] = param_grid[n]
+   elseif param_name == "gamma_a4"
+      paramsprefs_float.gamma_a[4] = param_grid[n]
+   elseif param_name == "gamma_b1"
+      paramsprefs_float.gamma_b[1] = param_grid[n]
+   elseif param_name == "gamma_b2"
+      paramsprefs_float.gamma_b[2] = param_grid[n]
+   elseif param_name == "gamma_b3"
+      paramsprefs_float.gamma_b[3] = param_grid[n]
+   elseif param_name == "gamma_b4"
+      paramsprefs_float.gamma_b[4] = param_grid[n]
+   else
+      throw(error("invalid parameter name"))
+   end
 
     if param_vec[1] < 1. || param_vec[2] < 1. || param_vec[3] <= 0. || param_vec[3] >= 1. ||
       param_vec[4] <= 0. || param_vec[4] >= 1. || param_vec[16] <= 0. ||
@@ -730,10 +806,10 @@ function vary_B_hi(initial_state_data, param_vec::Array,
       # simulate dataset and compute moments, whether serial or parallel
       if par_flag == 0
          sim_moments, error_log = dgp_moments(initial_state_data, paramsprefs_float, paramsdec_float, paramsshock_float,
-            T=T, seed=seed, S=S, N=N, sample_code=sample_code, restrict_flag=restrict_flag, error_log_flag=error_log_flag)
+            seed=seed, N=N, restrict_flag=restrict_flag, error_log_flag=error_log_flag)
       elseif par_flag == 1
          sim_moments, error_log = dgp_moments_par(initial_state_data, paramsprefs_float, paramsdec_float, paramsshock_float,
-            T=T, seed=seed, S=S, N=N, sample_code=sample_code, restrict_flag=restrict_flag, par_N=par_N, error_log_flag=error_log_flag)
+            seed=seed, N=N, restrict_flag=restrict_flag, par_N=par_N, error_log_flag=error_log_flag)
       else
          throw(error("par_flag must be 0 or 1"))
       end
@@ -745,11 +821,114 @@ function vary_B_hi(initial_state_data, param_vec::Array,
 
   end
 
-  param_name = "B_hi"
-
   return param_grid, moment_storage, param_name
 
   # graph each moment
   # plot_moments(param_grid, moment_storage, "B_hi")
+
+end
+
+#= Informative Moment Graphing - Quantiles =#
+
+# plot quantiles of a moment, varying bin in which single parameter is "fixed"
+
+function plot_moment_quantiles(moment_index::Int64, param_index::Int64, param_quantiles, moment_storage_25, moment_storage_50, moment_storage_75, data_moments)
+
+   moments_desc = ["Mean a2", "Mean b2", "Mean savings", "Mean x",
+    "Stddev a2", "Stddev b", "Stddev savings", "Stddev x",
+    "Cor[s,x]",
+    "Cor[savings,y]", "Cor[savings,a]", "Cor[savings,b]",
+    "Cor[x,y]", "Cor[x,a]", "Cor[x,b]",
+    "E[savings|1st quant. y]","E[savings|2nd quant. y]","E[savings|3rd quant. y]","E[savings|4th quant. y]",
+    "E[savings|1st quant. a]","E[savings|2nd quant. a]","E[savings|3rd quant. a]","E[savings|4th quant. a]",
+    "E[savings|1st quant. b]","E[savings|2nd quant. b]","E[savings|3rd quant. b]","E[savings|4th quant. b]",
+    "E[x|1st quant. y]","E[x|2nd quant. y]","E[x|3rd quant. y]","E[x|4th quant. y]",
+    "E[x|1st quant. a]","E[x|2nd quant. a]","E[x|3rd quant. a]","E[x|4th quant. a]",
+    "E[x|1st quant. b]","E[x|2nd quant. b]","E[x|3rd quant. b]","E[x|4th quant. b]"]
+
+   param_desc = ["B_hi", "B_lo", "alphaT1_hi", "alphaT1_lo",
+      "gamma_y2", "gamma_y3", "gamma_y4","gamma_a1","gamma_a2","gamma_a3","gamma_a4",
+      "gamma_b1","gamma_b2","gamma_b3","gamma_b4","eps_b_var","iota0","iota1","iota2","iota3"]
+
+   moment_name = moments_desc[moment_index]
+
+   param_name = param_desc[param_index]
+
+   plot_fig = figure()
+   plot(param_quantiles, moment_storage_25[:,moment_index],label="25th Perc.")
+   plot(param_quantiles, moment_storage_50[:,moment_index],label="50th Perc.")
+   plot(param_quantiles, moment_storage_75[:,moment_index],label="75th Perc.")
+   plot(param_quantiles, ones(length(param_quantiles))*data_moments[moment_index],label="data")
+   xlabel(param_name)
+   ylabel(moment_name)
+   ax = PyPlot.gca()
+   ax[:legend](loc="lower right")
+   title(string(moment_name, " Varying ", param_name))
+
+end
+
+# generate plots for all moments and one parameter
+
+function plot_moment_quantiles_all_moments(param_index::Int64, param_quantiles, moment_storage_25, moment_storage_50, moment_storage_75, data_moments)
+
+   for i in 1:length(moment_storage_25[1,:])
+      plot_moment_quantiles(i, param_index, param_quantiles, moment_storage_25, moment_storage_50, moment_storage_75, data_moments)
+   end
+
+end
+
+# generate plots for all parameters and one moment
+
+function plot_moment_quantiles_all_params(moment_index::Int64, data_moments, path_storage; bin_N=5)
+
+   for i in 1:20
+      compute_quantile_output = param_constant_quantile(i, path_storage)
+
+      plot_moment_quantiles(moment_index, i, compute_quantile_output[2], compute_quantile_output[3], compute_quantile_output[4], compute_quantile_output[5], data_moments)
+   end
+
+end
+
+# compute quantiles holding single parameter constant (within a bin)
+
+function param_constant_quantile(param_index::Int, path_storage; bin_N=5)
+
+   # import stored sobol sequence of parameters and moments
+   sobol_storage = readcsv(path_storage)
+
+   # extract number of moments
+   N_moments = length(sobol_storage[1,21:length(sobol_storage[1,:])])
+
+   # subset stored sequence to parameter vectors that did not violate constraints
+   sobol_storage_valid = sobol_storage[find(x->x!=Inf, sobol_storage[:,21]),:]
+
+   # compute bins for paramter to hold "fixed"
+   param_quantiles = quantile(sobol_storage_valid[:,param_index], (linspace(1,bin_N,bin_N)-ones(bin_N))/(bin_N-1))
+
+   ## For each bin, compute 25th, 50th, and 75th quantiles of each moment
+
+   # initialize moment storage
+   moment_storage_25 = zeros(bin_N,N_moments)
+   moment_storage_50 = zeros(bin_N,N_moments)
+   moment_storage_75 = zeros(bin_N,N_moments)
+
+   for n in 1:bin_N
+      # find indices of fixed parameter in proper bin
+      if n == 1
+         bin_indices = find(x->x<=param_quantiles[n], sobol_storage_valid[:,param_index])
+      else
+         bin_indices = intersect(find(x->x>param_quantiles[n-1], sobol_storage_valid[:,param_index]),
+            find(x->x<=param_quantiles[n], sobol_storage_valid[:,param_index]))
+      end
+
+      for moment_index in 1:N_moments
+         moment_storage_25[n,moment_index] = quantile(sobol_storage_valid[bin_indices, 20+moment_index], 0.25)
+         moment_storage_50[n,moment_index] = quantile(sobol_storage_valid[bin_indices, 20+moment_index], 0.5)
+         moment_storage_75[n,moment_index] = quantile(sobol_storage_valid[bin_indices, 20+moment_index], 0.75)
+      end
+
+   end
+
+   return param_index, param_quantiles, moment_storage_25, moment_storage_50, moment_storage_75
 
 end

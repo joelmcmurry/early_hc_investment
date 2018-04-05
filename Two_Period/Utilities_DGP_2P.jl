@@ -219,7 +219,7 @@ function sim_paths_split(initial_states, sample_types, shocks_y, shocks_b,
 
 end
 
-## Given S Paths of Shocks, Solve HH Problem for Each Type and Store Average Choices and States Given Type Probabilities
+## Given Simulated Sample, Solve HH Problem
 
 # takes multiple arguments
 
@@ -369,7 +369,7 @@ end
 
 function sim_choices(sim_choices_arg::SimChoiceArg)
 
-   sim_choices(sim_choices_arg.initial_states, sim_choices.arg.sample_types, sim_choices_arg.shocks_y, sim_choices_arg.shocks_b,
+   sim_choices(sim_choices_arg.initial_states, sim_choices_arg.sample_types, sim_choices_arg.shocks_y, sim_choices_arg.shocks_b,
     sim_choices_arg.paramsprefs, sim_choices_arg.paramsdec, sim_choices_arg.paramsshock, error_log_flag=sim_choices_arg.error_log_flag)
 
 end

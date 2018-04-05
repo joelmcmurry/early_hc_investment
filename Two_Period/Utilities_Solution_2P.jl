@@ -31,9 +31,9 @@ mutable struct ParametersDec
 
   function ParametersDec(;beta=0.5, r=0.18, B=1.,
     alphaT1=0.5, alphaT2=1-alphaT1,
-    iota0=1.87428633, iota1=0.42122805,
-    iota2=0.05979631, iota3=0.0,
-    beta0=4.134, beta1=0.03, beta2=0.003, rho_y=0.997)
+    iota0=2.97, iota1=0.27,
+    iota2=0.02, iota3=0.,
+    beta0=4.134, beta1=0.03, beta2=0.003, rho_y=1.002)
 
     new(beta, r, B, alphaT1, alphaT2, iota0, iota1, iota2, iota3, beta0, beta1, beta2, rho_y)
 
@@ -70,7 +70,7 @@ mutable struct ParametersShock
   sd_num_y :: Float64 ## Number of SD to allow for shock values
 
   function ParametersShock(;eps_b_mu=0.0, eps_b_var=0.022, eps_b_discrete_N=10,
-              eps_y_mu=0.0, eps_y_var=0.2513478, eps_y_discrete_N=10,
+              eps_y_mu=0.0, eps_y_var=0.52, eps_y_discrete_N=10,
               sd_num_b=2.0, sd_num_y=2.0)
 
     # discretize b distribution
@@ -109,66 +109,6 @@ mutable struct ParametersShock
       eps_y_discrete_range, eps_y_dist_discrete,
       eps_joint_discrete_N, eps_joint_discrete_range, eps_joint_dist_discrete,
       sd_num_b, sd_num_y)
-
-  end
-
-end
-
-## State Grids
-
-mutable struct StateGrids
-  y_min :: Array{Float64} ## income grid lower bound
-  y_max :: Array{Float64} ## income grid upper bound
-  y_N :: Array{Int64} ## number of income grid points
-  y_grid :: Array ## income grid in t=1
-  y_gridT :: Array ## income grid in t=T
-
-  a_min :: Array{Float64} ## asset grid lower bound
-  a_max :: Array{Float64} ## asset grid upper bound
-  a_N :: Array{Int64} ## number of asset grid points
-  a_grid :: Array ## asset grid in t=1
-  a_gridT :: Array ## asset grid in t=2
-
-  b_min :: Array{Float64} ## HC grid lower bound
-  b_max :: Array{Float64} ## HC grid upper bound
-  b_N :: Array{Int64} ## number of HC grid points
-  b_grid :: Array ## HC grid in t=1
-  b_gridT :: Array ## HC grid in t=T
-
-  state_N :: Array{Int64} ## number of state grid points
-  state_grid :: Array ## state grid in t=1
-  state_gridT :: Array ## state grid in t=T
-
-  function StateGrids(;y_min=[1000.0 1000.0], y_max=[150000.0 150000.0], y_N=[5 5],
-              a_min=[1.0 1.0], a_max=[100000.0 100000.0], a_N=[5 5],
-              b_min=[5.0 15.0], b_max=[60.0 70.0], b_N=[5 5])
-
-    # create grids (uniform)
-
-    # y_grid = linspace(y_min, y_max, y_N)
-    # a_grid = linspace(a_min, a_max, a_N)
-    # b_grid = linspace(b_min, b_max, b_N)
-
-    # create grids (chebyshev spacing)
-
-    y_grid = cheby_nodes!(y_min[1], y_max[1], y_N[1])
-    y_gridT = cheby_nodes!(y_min[2], y_max[2], y_N[2])
-
-    a_grid = cheby_nodes!(a_min[1], a_max[1], a_N[1])
-    a_gridT = cheby_nodes!(a_min[2], a_max[2], a_N[2])
-
-    b_grid = cheby_nodes!(b_min[1], b_max[1], b_N[1])
-    b_gridT = cheby_nodes!(b_min[2], b_max[2], b_N[2])
-
-    state_N = y_N.*a_N.*b_N
-
-    state_grid = gridmake(y_grid, a_grid, b_grid)
-    state_gridT = gridmake(y_gridT, a_gridT, b_gridT)
-
-    new(y_min, y_max, y_N, y_grid, y_gridT,
-      a_min, a_max, a_N, a_grid, a_gridT,
-      b_min, b_max, b_N, b_grid, b_gridT,
-      state_N, state_grid, state_gridT)
 
   end
 
@@ -229,14 +169,14 @@ end
 
 # terminal utility
 
-function u_T(y::Float64, a::Float64, b::Float64, alphaT1::Float64, alphaT2::Float64,
+function u_T(y_annual::Float64, a::Float64, b::Float64, alphaT1::Float64, alphaT2::Float64,
     beta0::Float64, beta1::Float64, beta2::Float64, tuition::Float64, r::Float64)
 
     # annualize r
     r_annual = r/6.
 
     # present value of income
-    y_pv = dot(y*ones(4),(1/(1+r_annual)).^[1.0 2.0 3.0 4.0])
+    y_pv = dot(y_annual*ones(4),(1/(1+r_annual)).^[1.0 2.0 3.0 4.0])
 
     # present value of tuition
     t_pv = dot(tuition*ones(4),(1/(1+r_annual)).^[1.0 2.0 3.0 4.0])
@@ -247,14 +187,14 @@ end
 
 # RF college quality optimal choice
 
-function t_opt(y::Float64, a::Float64, b::Float64,
+function t_opt(y_annual::Float64, a::Float64, b::Float64,
   alphaT1::Float64, alphaT2::Float64, beta0::Float64, beta1::Float64, beta2::Float64, r::Float64)
 
   # annualize r
   r_annual = r/6.
 
   pv_scale = dot(ones(4),(1/(1+r_annual)).^[1.0 2.0 3.0 4.0])
-  y_pv = dot(y*ones(4),(1/(1+r_annual)).^[1.0 2.0 3.0 4.0])
+  y_pv = dot(y_annual*ones(4),(1/(1+r_annual)).^[1.0 2.0 3.0 4.0])
 
   t_star = alphaT2*(beta1+beta2*log(b))*(y_pv + a)/
         (pv_scale*(alphaT1 + alphaT2*(beta1+beta2*log(b))))
@@ -265,12 +205,12 @@ end
 
 # terminal value closed form
 
-function EV_T(y::Float64, a::Float64, b::Float64, paramsdec::ParametersDec)
+function EV_T(y_annual::Float64, a::Float64, b::Float64, paramsdec::ParametersDec)
 
-  t_star = max(t_opt(y, a, b, paramsdec.alphaT1, paramsdec.alphaT2,
+  t_star = max(t_opt(y_annual, a, b, paramsdec.alphaT1, paramsdec.alphaT2,
     paramsdec.beta0, paramsdec.beta1, paramsdec.beta2, paramsdec.r), 1.0)
 
-  Value = paramsdec.B*u_T(y, a, b, paramsdec.alphaT1, paramsdec.alphaT2,
+  Value = paramsdec.B*u_T(y_annual, a, b, paramsdec.alphaT1, paramsdec.alphaT2,
     paramsdec.beta0, paramsdec.beta1, paramsdec.beta2, t_star, paramsdec.r)
 
   return Value
