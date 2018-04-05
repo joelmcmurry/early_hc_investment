@@ -14,13 +14,13 @@ nlsy79data = readtable("C:/Users/j0el/Documents/Wisconsin/Projects/Early_HC_Inve
 
 nlsy79data_formatted = data_transform(nlsy79data)
 
+initial_state_data = nlsy79data_formatted
+
 paramsdec = ParametersDec()
 paramsprefs = ParametersPrefs()
 paramsshock = ParametersShock()
 
 #= Test DGP =#
-
-initial_state_data = nlsy79data_formatted
 
 test_paths = sim_paths(initial_state_data, paramsshock, paramsprefs, seed=1234, N=1000)
 

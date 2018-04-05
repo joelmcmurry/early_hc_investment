@@ -327,7 +327,7 @@ function sim_choices(initial_states::Array{Float64}, sample_prefs::Array{Float64
 
   end
 
-  return states_y, states_a, states_b, choices_savings, choices_x, error_log
+  return states_y, states_a, states_b, choices_savings, choices_x, sample_prefs, error_log
 
 end
 
