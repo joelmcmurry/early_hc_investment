@@ -9,41 +9,44 @@ include("Utilities_Solution_2P.jl")
 #= Structures =#
 
 mutable struct ParametersPrefs
-  B_hi :: Float64 ## high future valuation
-  B_lo :: Float64 ## low future valuation
-  alphaT1_hi :: Float64 ##  high weight on assets
-  alphaT1_lo :: Float64 ## low weight on assets
+  sigma_B :: Float64 ## common stddev of B
+  sigma_alphaT1 :: Float64 ## common stddev of alphaT1
+  rho :: Float64 ##  common correlation
+  Sigma :: Array{Float64} ## var-covar matrix
 
-  gamma_y :: Array{Float64} ## type probability parameter vector for income (FIRST PARAMETER IS LOCKED DOWN AT 1)
-  gamma_a :: Array{Float64} ## type probability parameter vector for assets
-  gamma_b :: Array{Float64} ## type probability parameter vector for hc
+  gamma_0 :: Array{Float64} ## intercept of mean function
+  gamma_y :: Array{Float64} ## income coefficient of mean function
+  gamma_a :: Array{Float64} ## asset coefficient of mean function
+  gamma_b :: Array{Float64} ## hc coefficient of mean function
 
-  function ParametersPrefs(;B_hi=5., B_lo=1., alphaT1_hi=0.75, alphaT1_lo=0.25,
-    gamma_y=[1., 1., 1., 1.], gamma_a=[1., 1., 1., 1.], gamma_b=[1., 1., 1., 1.])
+  function ParametersPrefs(;sigma_B=0.1, sigma_alphaT1=0.1, rho=0.,
+    gamma_0=[0.1, 0.1], gamma_y=[0.1, 0.1], gamma_a=[0.1, 0.1], gamma_b=[0.1, 0.1])
 
-    new(B_hi, B_lo, alphaT1_hi, alphaT1_lo, gamma_y, gamma_a, gamma_b)
+    Sigma = [sigma_B^2 rho*sigma_B*sigma_alphaT1; rho*sigma_alphaT1*sigma_B sigma_alphaT1^2]
+
+    new(sigma_B, sigma_alphaT1, rho, Sigma, gamma_0, gamma_y, gamma_a, gamma_b)
 
   end
 
 end
 
-# create types given preference parameters
+# draw state-specific types
 
-function type_construct(B_hi::Float64, B_lo::Float64, alphaT1_hi::Float64, alphaT1_lo::Float64)
+function type_construct(y::Float64, a::Float64, b::Float64, paramspefs::ParametersPrefs; seed=1234, type_N=2)
 
-  # construct vector of types from preferences
-  type1 = [B_hi; alphaT1_hi]
-  type2 = [B_hi; alphaT1_lo]
-  type3 = [B_lo; alphaT1_hi]
-  type4 = [B_lo; alphaT1_lo]
+  # compute mean of joint distribution given type
+  mu_state = paramsprefs.gamma_0 + paramsprefs.gamma_y*y + paramsprefs.gamma_a*a + paramsprefs.gamma_b*b
 
-  type_vec = Array{Array}(4)
-  type_vec[1] = type1
-  type_vec[2] = type2
-  type_vec[3] = type3
-  type_vec[4] = type4
+  # draw N types
+  srand(seed); type_vec = rand(MvNormal(mu_state, paramsprefs.Sigma), type_N)
 
-  return type_vec
+  # compute density of each draw
+  type_pdf = pdf(MvNormal(mu_state, paramsprefs.Sigma), type_vec)
+
+  # transform to probabilities
+  type_prob = type_pdf./sum(type_pdf)
+
+  return type_vec, type_prob
 
 end
 
@@ -52,48 +55,12 @@ mutable struct SimChoiceArg
    sample_types::Array{Float64}
    shocks_y::Array{Float64}
    shocks_b::Array{Float64}
+   type_vec::Array{Float64}
+   type_prob::Array{Float64}
    paramsprefs::ParametersPrefs
    paramsdec::ParametersDec
    paramsshock::ParametersShock
    error_log_flag::Int64
-
-end
-
-#= Type Probability Calculation =#
-
-# compute function of linear combination of states
-
-function type_prob_numerator(type_index::Int64, y0::Float64, a0::Float64, b0::Float64, paramsprefs::ParametersPrefs)
-
-  computation_factor = 1.
-
-  # logit = 1/(1+exp(-paramsprefs.gamma_y[type_index]*y0/computation_factor -
-  #   paramsprefs.gamma_a[type_index]*a0/computation_factor - paramsprefs.gamma_b[type_index]*b0/computation_factor))
-
-  numerator = paramsprefs.gamma_y[type_index]*y0/computation_factor +
-      paramsprefs.gamma_a[type_index]*a0/computation_factor + paramsprefs.gamma_b[type_index]*b0/computation_factor
-
-  return numerator
-
-end
-
-# rescale logist probabilities so type probabilities sum to 1
-
-function type_prob(y0::Float64, a0::Float64, b0::Float64, paramsprefs::ParametersPrefs)
-
-  numerator1 = type_prob_numerator(1, y0, a0, b0, paramsprefs)
-  numerator2 = type_prob_numerator(2, y0, a0, b0, paramsprefs)
-  numerator3 = type_prob_numerator(3, y0, a0, b0, paramsprefs)
-  numerator4 = type_prob_numerator(4, y0, a0, b0, paramsprefs)
-
-  denominator = numerator1 + numerator2 + numerator3 + numerator4
-
-  prob1 = numerator1/denominator
-  prob2 = numerator2/denominator
-  prob3 = numerator3/denominator
-  prob4 = numerator4/denominator
-
-  return prob1, prob2, prob3, prob4
 
 end
 
@@ -102,7 +69,7 @@ end
 ## Draw N Household/Type/Shock Observations
 
 function sim_paths(initial_state_data, paramsshock::ParametersShock, paramsprefs::ParametersPrefs;
-  seed=1234, N=1000)
+  seed=1234, N=1000, type_N=2)
 
   # draw initial states from EDF, advancing seed by 1
   srand(seed); initial_draws = rand(DiscreteUniform(1,length(initial_state_data[1][1])),N)
@@ -122,8 +89,8 @@ function sim_paths(initial_state_data, paramsshock::ParametersShock, paramsprefs
 
   # assign types to sample based on type probabilities, proceed by unique states
   for i in 1:length(initial_states_unique[:,1])
-    # compute type probabilities
-    type_probs = type_prob(initial_states[i,1], initial_states[i,1], initial_states[i,1], paramsprefs)
+    # draw types and type probabilities
+    type_vec, type_prob = type_construct(initial_states[i,1], initial_states[i,2], initial_states[i,3], paramspefs, seed=seed, type_N=type_N)
 
     # find indices of draws with same initial states
     y_match = find(x->x==initial_states_unique[i,1],initial_states[:,1])
