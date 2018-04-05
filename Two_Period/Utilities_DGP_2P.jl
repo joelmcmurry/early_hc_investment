@@ -19,8 +19,8 @@ mutable struct ParametersPrefs
   gamma_a :: Array{Float64} ## asset coefficient of mean function
   gamma_b :: Array{Float64} ## hc coefficient of mean function
 
-  function ParametersPrefs(;sigma_B=0.1, sigma_alphaT1=0.1, rho=0.,
-    gamma_0=[0.1, 0.1], gamma_y=[0.1, 0.1], gamma_a=[0.1, 0.1], gamma_b=[0.1, 0.1])
+  function ParametersPrefs(;sigma_B=1., sigma_alphaT1=0.1, rho=0.,
+    gamma_0=[1., 0.1], gamma_y=[0.1, 0.1], gamma_a=[0.1, 0.1], gamma_b=[0.1, 0.1])
 
     Sigma = [sigma_B^2 rho*sigma_B*sigma_alphaT1; rho*sigma_alphaT1*sigma_B sigma_alphaT1^2]
 
@@ -32,7 +32,7 @@ end
 
 # draw state-specific types
 
-function type_construct(y::Float64, a::Float64, b::Float64, paramspefs::ParametersPrefs; seed=1234, type_N=2)
+function type_construct(y::Float64, a::Float64, b::Float64, paramsprefs::ParametersPrefs; seed=1234, type_N=2)
 
   # compute mean of joint distribution given type
   mu_state = paramsprefs.gamma_0 + paramsprefs.gamma_y*y + paramsprefs.gamma_a*a + paramsprefs.gamma_b*b
@@ -43,6 +43,9 @@ function type_construct(y::Float64, a::Float64, b::Float64, paramspefs::Paramete
   # compute density of each draw
   type_pdf = pdf(MvNormal(mu_state, paramsprefs.Sigma), type_vec)
 
+  # bound alpha between 0 and 1
+  type_vec[2,:] = 1./(1+exp.(-1.*type_vec[2,:]./10.))
+
   # transform to probabilities
   type_prob = type_pdf./sum(type_pdf)
 
@@ -52,11 +55,9 @@ end
 
 mutable struct SimChoiceArg
    initial_states::Array{Float64}
-   sample_types::Array{Float64}
+   sample_prefs::Array{Float64}
    shocks_y::Array{Float64}
    shocks_b::Array{Float64}
-   type_vec::Array{Float64}
-   type_prob::Array{Float64}
    paramsprefs::ParametersPrefs
    paramsdec::ParametersDec
    paramsshock::ParametersShock
@@ -81,7 +82,7 @@ function sim_paths(initial_state_data, paramsshock::ParametersShock, paramsprefs
   initial_states_unique = unique(initial_states,1)
 
   # initialize sample types
-  sample_types = zeros(N)
+  sample_prefs = zeros(N,2)
 
   # random type draws, advancing seed by 1
   srand(seed); type_draws = rand(N)
@@ -90,7 +91,7 @@ function sim_paths(initial_state_data, paramsshock::ParametersShock, paramsprefs
   # assign types to sample based on type probabilities, proceed by unique states
   for i in 1:length(initial_states_unique[:,1])
     # draw types and type probabilities
-    type_vec, type_prob = type_construct(initial_states[i,1], initial_states[i,2], initial_states[i,3], paramspefs, seed=seed, type_N=type_N)
+    type_vec, type_probs = type_construct(initial_states[i,1], initial_states[i,2], initial_states[i,3], paramsprefs, seed=seed, type_N=type_N)
 
     # find indices of draws with same initial states
     y_match = find(x->x==initial_states_unique[i,1],initial_states[:,1])
@@ -98,16 +99,16 @@ function sim_paths(initial_state_data, paramsshock::ParametersShock, paramsprefs
     b_match = find(x->x==initial_states_unique[i,3],initial_states[:,3])
     init_state_indices = intersect(y_match, a_match, b_match)
 
-    # assign types based on state-specific type probabilities
+    # assign types based on state-specific type probabilities (number of types is flexible)
     for j in 1:length(init_state_indices)
       if type_draws[init_state_indices[j]] <= type_probs[1]
-        sample_types[init_state_indices[j]] = 1.
-      elseif type_draws[init_state_indices[j]] > type_probs[1] && type_draws[j] <= type_probs[1]+type_probs[2]
-        sample_types[init_state_indices[j]] = 2.
-      elseif type_draws[init_state_indices[j]] > type_probs[1]+type_probs[2] && type_draws[j] <= type_probs[1]+type_probs[2]+type_probs[3]
-        sample_types[init_state_indices[j]] = 3.
+        sample_prefs[init_state_indices[j],:] = type_vec[:,1]
       else
-        sample_types[init_state_indices[j]] = 4.
+        for n in 2:type_N
+          if type_draws[init_state_indices[j]] > sum(type_probs[1:n-1]) && type_draws[init_state_indices[j]] <= sum(type_probs[1:n])
+            sample_prefs[init_state_indices[j],:] = type_vec[:,n]
+          end
+        end
       end
     end
 
@@ -118,13 +119,13 @@ function sim_paths(initial_state_data, paramsshock::ParametersShock, paramsprefs
   seed +=1
   srand(seed); shocks_b = rand(paramsshock.eps_b_dist,N)
 
-  return initial_states, sample_types, shocks_y, shocks_b
+  return initial_states, sample_prefs, shocks_y, shocks_b
 
 end
 
 # divide paths up into par_N sections for parallel processing
 
-function sim_paths_split(initial_states, sample_types, shocks_y, shocks_b,
+function sim_paths_split(initial_states, sample_prefs, shocks_y, shocks_b,
   paramsprefs::ParametersPrefs, paramsdec::ParametersDec, paramsshock::ParametersShock; par_N=2, error_log_flag=0)
 
    # initialize array of simulated choice sections
@@ -144,7 +145,7 @@ function sim_paths_split(initial_states, sample_types, shocks_y, shocks_b,
 
       # initialize sample and shock sections
       initial_states_section = zeros(1,3)
-      sample_types_section = 0.
+      sample_prefs_section = zeros(1,2)
       shocks_y_section = 0.
       shocks_b_section = 0.
 
@@ -159,20 +160,20 @@ function sim_paths_split(initial_states, sample_types, shocks_y, shocks_b,
         row_match = intersect(y_match, a_match, b_match)
 
         initial_states_section = vcat(initial_states_section, initial_states[row_match,:])
-        sample_types_section = vcat(sample_types_section, sample_types[row_match,:])
+        sample_prefs_section = vcat(sample_prefs_section, sample_prefs[row_match,:])
         shocks_y_section = vcat(shocks_y_section, shocks_y[row_match,:])
         shocks_b_section = vcat(shocks_b_section, shocks_b[row_match,:])
 
       end
 
       # trim leading zeros used for initialization
-      initial_states_section = initial_states_section[2:length(sample_types_section[:,1]),:]
-      sample_types_section = sample_types_section[2:length(sample_types_section[:,1]),:]
+      initial_states_section = initial_states_section[2:length(initial_states_section[:,1]),:]
+      sample_prefs_section = sample_prefs_section[2:length(sample_prefs_section[:,1]),:]
       shocks_y_section = shocks_y_section[2:length(shocks_y_section[:,1]),:]
       shocks_b_section = shocks_b_section[2:length(shocks_b_section[:,1]),:]
 
       # create and store simulated choice argument type with subset paths
-      sim_choices_arg_section = SimChoiceArg(initial_states_section, sample_types_section, shocks_y_section, shocks_b_section,
+      sim_choices_arg_section = SimChoiceArg(initial_states_section, sample_prefs_section, shocks_y_section, shocks_b_section,
         paramsprefs, paramsdec, paramsshock, error_log_flag)
       sim_choices_arg_array[i] = sim_choices_arg_section
 
