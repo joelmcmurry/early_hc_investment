@@ -191,21 +191,18 @@ end
 
 # takes multiple arguments
 
-function sim_choices(initial_states::Array{Float64}, sample_types::Array{Float64}, shocks_y::Array{Float64}, shocks_b::Array{Float64},
+function sim_choices(initial_states::Array{Float64}, sample_prefs::Array{Float64}, shocks_y::Array{Float64}, shocks_b::Array{Float64},
   paramsprefs::ParametersPrefs, paramsdec::ParametersDec, paramsshock::ParametersShock;
   error_log_flag=0)
 
   # initialize error log
   error_log = Any[]
 
-  # construct types given preferences
-  type_vec = type_construct(paramsprefs.B_hi, paramsprefs.B_lo, paramsprefs.alphaT1_hi, paramsprefs.alphaT1_lo)
-
   # extract N from sample
   N = length(initial_states[:,1])
 
   # extract unique initial conditions and types from sample
-  initial_states_types_unique = unique(hcat(initial_states, sample_types),1)
+  initial_states_types_unique = unique(hcat(initial_states, sample_prefs),1)
   N_unique = length(initial_states_types_unique[:,1])
 
   # extract unique initial conditions from sample
@@ -238,7 +235,7 @@ function sim_choices(initial_states::Array{Float64}, sample_types::Array{Float64
   states_b[1] = initial_states[:,3]
 
   # store decision rules by initial condition and type
-  choices_lookup_init_type = zeros(N_unique,6)
+  choices_lookup_init_type = zeros(N_unique,7)
 
   # initialize index for looping over both states and types
   init_type_index = 1
@@ -253,14 +250,14 @@ function sim_choices(initial_states::Array{Float64}, sample_types::Array{Float64
 
     row_match = intersect(y_match, a_match, b_match)
 
-    drawn_types = sort(unique(initial_states_types_unique[row_match,4]))
+    unique_prefs = unique(initial_states_types_unique[row_match,4:5],1)
 
     # initialize choices for endogenous starting values within HH (across types)
     choices0_type = zeros(2)
 
-    for type_index in 1:length(drawn_types)
+    for type_index in 1:length(unique_prefs[:,1])
 
-      type_drawn = Int(drawn_types[type_index])
+      drawn_prefs = unique_prefs[type_index,:]
 
       # start optimization with solution for previous type
       if type_index != 1
@@ -272,9 +269,9 @@ function sim_choices(initial_states::Array{Float64}, sample_types::Array{Float64
       end
 
       # update preferences given type
-      paramsdec.B = type_vec[type_drawn][1]
-      paramsdec.alphaT1 = type_vec[type_drawn][2]
-      paramsdec.alphaT2 = 1. - paramsdec.alphaT1
+      paramsdec.B = drawn_prefs[1]
+      paramsdec.alphaT1 = drawn_prefs[2]
+      paramsdec.alphaT2 = 1. - drawn_prefs[2]
 
       # solve childhood period decisions
       V0_type, choices0_type, converged_check, iterations_taken, error_log_state = bellman_optim_child!(initial_states_unique[n,1],
@@ -290,8 +287,8 @@ function sim_choices(initial_states::Array{Float64}, sample_types::Array{Float64
 
       # store decision rules by initial conditions and type
       choices_lookup_init_type[init_type_index,1:3] = initial_states_unique[n,1:3]
-      choices_lookup_init_type[init_type_index,4] = type_drawn
-      choices_lookup_init_type[init_type_index,5:6] = choices0_type
+      choices_lookup_init_type[init_type_index,4:5] = drawn_prefs
+      choices_lookup_init_type[init_type_index,6:7] = choices0_type
 
       # advance index
       init_type_index += 1
@@ -308,12 +305,13 @@ function sim_choices(initial_states::Array{Float64}, sample_types::Array{Float64
     y_match = find(x->x==choices_lookup_init_type[n,1], initial_states[:,1])
     a_match = find(x->x==choices_lookup_init_type[n,2], initial_states[:,2])
     b_match = find(x->x==choices_lookup_init_type[n,3], initial_states[:,3])
-    type_match = find(x->x==choices_lookup_init_type[n,4], sample_types)
+    B_match = find(x->x==choices_lookup_init_type[n,5], sample_prefs[:,1])
+    alphaT1_match = find(x->x==choices_lookup_init_type[n,6], sample_prefs[:,2])
 
-    row_match = intersect(y_match, a_match, b_match, type_match)
+    row_match = intersect(y_match, a_match, b_match, alphaT1_match)
 
     # look up decisions given initial conditions and type
-    choices_init_type = choices_lookup_init_type[n,5:6]
+    choices_init_type = choices_lookup_init_type[n,6:7]
 
     # store decisions for this draw
     choices_savings[1][row_match] = choices_init_type[1] - states_a[1][row_match]*(1+paramsdec.r)
@@ -337,7 +335,7 @@ end
 
 function sim_choices(sim_choices_arg::SimChoiceArg)
 
-   sim_choices(sim_choices_arg.initial_states, sim_choices_arg.sample_types, sim_choices_arg.shocks_y, sim_choices_arg.shocks_b,
+   sim_choices(sim_choices_arg.initial_states, sim_choices_arg.sample_prefs, sim_choices_arg.shocks_y, sim_choices_arg.shocks_b,
     sim_choices_arg.paramsprefs, sim_choices_arg.paramsdec, sim_choices_arg.paramsshock, error_log_flag=sim_choices_arg.error_log_flag)
 
 end
