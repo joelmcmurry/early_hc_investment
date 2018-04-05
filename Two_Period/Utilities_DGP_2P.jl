@@ -199,7 +199,7 @@ function sim_paths_split(initial_states, sample_types, shocks_y, shocks_b,
       end
 
       # trim leading zeros used for initialization
-      initial_states_section = initial_states_section[2:length(sample_types_section[:,1]),:]
+      initial_states_section = initial_states_section[2:length(initial_states_section[:,1]),:]
       sample_types_section = sample_types_section[2:length(sample_types_section[:,1]),:]
       shocks_y_section = shocks_y_section[2:length(shocks_y_section[:,1]),:]
       shocks_b_section = shocks_b_section[2:length(shocks_b_section[:,1]),:]
