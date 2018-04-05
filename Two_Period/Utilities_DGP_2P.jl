@@ -19,8 +19,8 @@ mutable struct ParametersPrefs
   gamma_a :: Array{Float64} ## asset coefficient of mean function
   gamma_b :: Array{Float64} ## hc coefficient of mean function
 
-  function ParametersPrefs(;sigma_B=1., sigma_alphaT1=0.1, rho=0.,
-    gamma_0=[1., 0.1], gamma_y=[0.1, 0.1], gamma_a=[0.1, 0.1], gamma_b=[0.1, 0.1])
+  function ParametersPrefs(;sigma_B=5., sigma_alphaT1=5., rho=0.,
+    gamma_0=[1., 0.], gamma_y=[0.1, 0.001], gamma_a=[0.1, 0.001], gamma_b=[0.1, 0.001])
 
     Sigma = [sigma_B^2 rho*sigma_B*sigma_alphaT1; rho*sigma_alphaT1*sigma_B sigma_alphaT1^2]
 
@@ -34,8 +34,13 @@ end
 
 function type_construct(y::Float64, a::Float64, b::Float64, paramsprefs::ParametersPrefs; seed=1234, type_N=2)
 
+  # for computational reasons, set factor by which we divide states
+  y_div = 100000.
+  a_div = 10000.
+  b_div= 1.
+
   # compute mean of joint distribution given type
-  mu_state = paramsprefs.gamma_0 + paramsprefs.gamma_y*y + paramsprefs.gamma_a*a + paramsprefs.gamma_b*b
+  mu_state = paramsprefs.gamma_0 + paramsprefs.gamma_y*y/y_div + paramsprefs.gamma_a*a/a_div + paramsprefs.gamma_b*b/b_div
 
   # draw N types
   srand(seed); type_vec = rand(MvNormal(mu_state, paramsprefs.Sigma), type_N)
@@ -44,7 +49,7 @@ function type_construct(y::Float64, a::Float64, b::Float64, paramsprefs::Paramet
   type_pdf = pdf(MvNormal(mu_state, paramsprefs.Sigma), type_vec)
 
   # bound alpha between 0 and 1
-  type_vec[2,:] = 1./(1+exp.(-1.*type_vec[2,:]./10.))
+  type_vec[2,:] = 1./(1+exp.(-1.*type_vec[2,:]))
 
   # transform to probabilities
   type_prob = type_pdf./sum(type_pdf)
@@ -62,6 +67,9 @@ mutable struct SimChoiceArg
    paramsdec::ParametersDec
    paramsshock::ParametersShock
    error_log_flag::Int64
+   bellman_trace::String
+   bellman_iter::Int64
+   bellman_tol::Float64
 
 end
 
@@ -126,7 +134,8 @@ end
 # divide paths up into par_N sections for parallel processing
 
 function sim_paths_split(initial_states, sample_prefs, shocks_y, shocks_b,
-  paramsprefs::ParametersPrefs, paramsdec::ParametersDec, paramsshock::ParametersShock; par_N=2, error_log_flag=0)
+  paramsprefs::ParametersPrefs, paramsdec::ParametersDec, paramsshock::ParametersShock; par_N=2, error_log_flag=0,
+  bellman_trace=false, bellman_iter=5000, bellman_tol=1e-9)
 
    # initialize array of simulated choice sections
    sim_choices_arg_array = Array{SimChoiceArg}(par_N)
@@ -174,7 +183,7 @@ function sim_paths_split(initial_states, sample_prefs, shocks_y, shocks_b,
 
       # create and store simulated choice argument type with subset paths
       sim_choices_arg_section = SimChoiceArg(initial_states_section, sample_prefs_section, shocks_y_section, shocks_b_section,
-        paramsprefs, paramsdec, paramsshock, error_log_flag)
+        paramsprefs, paramsdec, paramsshock, error_log_flag, bellman_trace, bellman_iter, bellman_tol)
       sim_choices_arg_array[i] = sim_choices_arg_section
 
       # update indices
@@ -193,7 +202,7 @@ end
 
 function sim_choices(initial_states::Array{Float64}, sample_prefs::Array{Float64}, shocks_y::Array{Float64}, shocks_b::Array{Float64},
   paramsprefs::ParametersPrefs, paramsdec::ParametersDec, paramsshock::ParametersShock;
-  error_log_flag=0)
+  error_log_flag=0, bellman_trace=false, bellman_iter=5000, bellman_tol=1e-9)
 
   # initialize error log
   error_log = Any[]
@@ -260,13 +269,13 @@ function sim_choices(initial_states::Array{Float64}, sample_prefs::Array{Float64
       drawn_prefs = unique_prefs[type_index,:]
 
       # start optimization with solution for previous type
-      if type_index != 1
-        aprime_start = choices0_type[1]
-        x_start = choices0_type[2]
-      else
+      # if type_index != 1
+      #  aprime_start = choices0_type[1]
+    #    x_start = choices0_type[2]
+      # else
         aprime_start = 1.
         x_start = 1.
-      end
+      # end
 
       # update preferences given type
       paramsdec.B = drawn_prefs[1]
@@ -276,7 +285,8 @@ function sim_choices(initial_states::Array{Float64}, sample_prefs::Array{Float64
       # solve childhood period decisions
       V0_type, choices0_type, converged_check, iterations_taken, error_log_state = bellman_optim_child!(initial_states_unique[n,1],
         initial_states_unique[n,2], initial_states_unique[n,3], paramsdec, paramsshock,
-        aprime_start=aprime_start, x_start=x_start, error_log_flag=error_log_flag)
+        aprime_start=aprime_start, x_start=x_start, error_log_flag=error_log_flag,
+        opt_trace=bellman_trace, opt_iter=bellman_iter, opt_tol=bellman_tol)
 
       # record errors if prompted
       if error_log_flag == 1
@@ -336,7 +346,8 @@ end
 function sim_choices(sim_choices_arg::SimChoiceArg)
 
    sim_choices(sim_choices_arg.initial_states, sim_choices_arg.sample_prefs, sim_choices_arg.shocks_y, sim_choices_arg.shocks_b,
-    sim_choices_arg.paramsprefs, sim_choices_arg.paramsdec, sim_choices_arg.paramsshock, error_log_flag=sim_choices_arg.error_log_flag)
+    sim_choices_arg.paramsprefs, sim_choices_arg.paramsdec, sim_choices_arg.paramsshock, error_log_flag=sim_choices_arg.error_log_flag,
+    bellman_trace=sim_choices_arg.bellman_trace, bellman_iter=sim_choices_arg.bellman_iter, bellman_tol=sim_choices_arg.bellman_tol)
 
 end
 

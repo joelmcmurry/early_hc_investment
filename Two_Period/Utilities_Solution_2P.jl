@@ -223,7 +223,7 @@ end
 
 function bellman_optim_child!(y::Float64, a::Float64, b::Float64,
   paramsdec::ParametersDec, paramsshock::ParametersShock;
-  aprime_start=1., x_start=1., opt_code="neldermead", error_log_flag=0)
+  aprime_start=1., x_start=1., opt_code="neldermead", error_log_flag=0, opt_trace=false, opt_iter=5000, opt_tol=1e-9)
 
   # create endogenous maximum for next-period asset holdings
   aprime_max = y + (1+paramsdec.r)*a
@@ -264,11 +264,11 @@ function bellman_optim_child!(y::Float64, a::Float64, b::Float64,
 
   # solve optimization problem
   if opt_code == "neldermead"
-   opt_agent = optimize(utility, [aprime_start, x_start], show_trace=false, iterations=5000)
+   opt_agent = optimize(utility, [aprime_start, x_start], show_trace=opt_trace, iterations=opt_iter, g_tol=opt_tol)
   elseif opt_code == "lbfgs"
    opt_agent = optimize(utility, [aprime_start, x_start], LBFGS())
   elseif opt_code == "simulatedannealing"
-   opt_agent = optimize(utility, [aprime_start, x_start], method=SimulatedAnnealing(), iterations=5000)
+   opt_agent = optimize(utility, [aprime_start, x_start], method=SimulatedAnnealing(), iterations=opt_iter)
   else
    throw(error("opt_code must be neldermead or lbfgs or simulatedannealing"))
   end

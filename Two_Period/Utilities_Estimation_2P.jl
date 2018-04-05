@@ -90,13 +90,14 @@ end
 #= DGP Simulation and Moment Generation =#
 
 function dgp_moments(initial_state_data, paramsprefs::ParametersPrefs, paramsdec::ParametersDec, paramsshock::ParametersShock;
-  seed=1234, N=1000, restrict_flag=1, error_log_flag=0, type_N=2)
+  seed=1234, N=1000, restrict_flag=1, error_log_flag=0, type_N=2, bellman_trace=false, bellman_iter=5000, bellman_tol=1e-9)
 
   # simulate dataset
   sim_shocks = sim_paths(initial_state_data, paramsshock, paramsprefs, seed=seed, N=N, type_N=type_N)
 
   sim_data = sim_choices(sim_shocks[1], sim_shocks[2], sim_shocks[3], sim_shocks[4],
-    paramsprefs, paramsdec, paramsshock, error_log_flag=error_log_flag)
+    paramsprefs, paramsdec, paramsshock, error_log_flag=error_log_flag,
+    bellman_trace=bellman_trace, bellman_iter=bellman_iter, bellman_tol=bellman_tol)
 
   # calculate simulated data moments
   sim_moments = moment_gen_dist(sim_data, restrict_flag=restrict_flag)
@@ -108,14 +109,15 @@ end
 # parallelize choices
 
 function dgp_moments_par(initial_state_data, paramsprefs::ParametersPrefs, paramsdec::ParametersDec, paramsshock::ParametersShock;
-  seed=1234, N=1000, restrict_flag=1, par_N=2, error_log_flag=0, type_N=2)
+  seed=1234, N=1000, restrict_flag=1, par_N=2, error_log_flag=0, type_N=2, bellman_trace=false, bellman_iter=5000, bellman_tol=1e-9)
 
   # simulate dataset
   sim_shocks = sim_paths(initial_state_data, paramsshock, paramsprefs, seed=seed, N=N, type_N=type_N)
 
   # split dataset and create objects that can be read by choice simulator
   split_sim_choice_arg = sim_paths_split(sim_shocks[1], sim_shocks[2], sim_shocks[3], sim_shocks[4],
-   paramsprefs, paramsdec, paramsshock, par_N=par_N, error_log_flag=error_log_flag)
+   paramsprefs, paramsdec, paramsshock, par_N=par_N, error_log_flag=error_log_flag,
+   bellman_trace=bellman_trace, bellman_iter=bellman_iter, bellman_tol=bellman_tol)
 
   # parallel compute choices
   sim_choices_par = pmap(sim_choices, split_sim_choice_arg)
@@ -192,7 +194,7 @@ function smm(data_formatted, paramsprefs::ParametersPrefs, paramsdec::Parameters
   N=1000,
   opt_code="neldermead", restrict_flag=1, seed=1234, error_log_flag=0,
   opt_trace=false, opt_iter=1000, print_flag=false, opt_tol=1e-9, par_flag=0, par_N=4,
-  pref_only_flag=0, type_N=2)
+  pref_only_flag=0, type_N=2, bellman_trace=false, bellman_iter=5000, bellman_tol=1e-9)
 
   # generate data moments
   data_moments = moment_gen_dist(data_formatted, restrict_flag=restrict_flag)
@@ -215,7 +217,8 @@ function smm(data_formatted, paramsprefs::ParametersPrefs, paramsdec::Parameters
   smm_obj_inner(param_vec) = smm_obj(data_formatted, data_moments, W, param_vec,
     paramsprefs_float, paramsdec_float, paramsshock_float,
     N=N, restrict_flag=restrict_flag, seed=seed, error_log_flag=error_log_flag,
-    print_flag=print_flag, par_flag=par_flag, par_N=par_N, pref_only_flag=pref_only_flag, type_N=type_N)
+    print_flag=print_flag, par_flag=par_flag, par_N=par_N, pref_only_flag=pref_only_flag, type_N=type_N,
+    bellman_trace=bellman_trace, bellman_iter=bellman_iter, bellman_tol=bellman_tol)
 
    if pref_only_flag == 0
       start_vec = [sigma_B_start, sigma_alphaT1_start, rho_start,
@@ -257,7 +260,7 @@ function smm_sobol(data_formatted, paramsprefs::ParametersPrefs, paramsdec::Para
    gamma_b1_lb=1., gamma_b1_ub=2., gamma_b2_lb=1., gamma_b2_ub=2.,
    eps_b_var_lb=0.0001, eps_b_var_ub=0.1, iota0_lb=-2., iota0_ub=2., iota1_lb=0.0001, iota1_ub=2., iota2_lb=0.0001, iota2_ub=1., iota3_lb=-2., iota3_ub=2.,
    N=1000, restrict_flag=1, seed=1234, error_log_flag=0, print_flag=false,
-   par_flag=0, par_N=4, pref_only_flag=1, type_N=2, pref_only_flag=0)
+   par_flag=0, par_N=4, pref_only_flag=0, type_N=2, bellman_trace=false, bellman_iter=5000, bellman_tol=1e-9)
 
    # store number of parameters
    if pref_only_flag == 0
@@ -330,7 +333,8 @@ function smm_sobol(data_formatted, paramsprefs::ParametersPrefs, paramsdec::Para
       else
          obj_val, moments = smm_obj_moments(data_formatted, data_moments, W, param_sobol, paramsprefs_float, paramsdec_float, paramsshock_float,
             N=N, restrict_flag=restrict_flag, seed=seed, error_log_flag=error_log_flag, print_flag=print_flag,
-            par_flag=par_flag, par_N=par_N, type_N=type_N, pref_only_flag=pref_only_flag)
+            par_flag=par_flag, par_N=par_N, type_N=type_N, pref_only_flag=pref_only_flag,
+            bellman_trace=bellman_trace, bellman_iter=bellman_iter, bellman_tol=bellman_tol)
 
          sobol_storage_i[param_N+1:param_N+39] = moments
 
@@ -363,7 +367,8 @@ function smm_write_results(path, data_formatted, paramsprefs::ParametersPrefs, p
    eps_b_var_start=0.022, iota0_start=1.87, iota1_start=0.42, iota2_start=0.06, iota3_start=0.0,
    N=1000,
    opt_code="neldermead", restrict_flag=1, seed=1234, error_log_flag=0,
-   opt_trace=false, opt_iter=1000, opt_tol=1e-9, print_flag=false, par_flag=0, par_N=4, type_N=2, pref_only_flag=0)
+   opt_trace=false, opt_iter=1000, opt_tol=1e-9, print_flag=false, par_flag=0, par_N=4, type_N=2, pref_only_flag=0,
+   bellman_trace=false, bellman_iter=5000, bellman_tol=1e-9)
 
    # run SMM
    estimation_time = @elapsed estimation_result = smm(data_formatted, paramsprefs, paramsdec, paramsshock,
@@ -376,7 +381,7 @@ function smm_write_results(path, data_formatted, paramsprefs::ParametersPrefs, p
       iota0_start=iota0_start, iota1_start=iota1_start, iota2_start=iota2_start, iota3_start=iota3_start,
       N=N, opt_code=opt_code, restrict_flag=restrict_flag, seed=seed,
       error_log_flag=error_log_flag, opt_trace=opt_trace, opt_iter=opt_iter, opt_tol=opt_tol, print_flag=print_flag,
-      par_flag=par_flag, par_N=par_N, type_N=type_N)
+      par_flag=par_flag, par_N=par_N, type_N=type_N, bellman_trace=bellman_trace, bellman_iter=bellman_iter, bellman_tol=bellman_tol)
 
    # write to text file
    writedlm(path, transpose([estimation_time; estimation_result.minimum; estimation_result.minimizer]), ", ")
@@ -393,7 +398,7 @@ function smm_sobol_write_results(path_min, path_store, data_formatted, paramspre
    gamma_b1_lb=1., gamma_b1_ub=2., gamma_b2_lb=1., gamma_b2_ub=2.,
    eps_b_var_lb=0.0001, eps_b_var_ub=0.1, iota0_lb=-2., iota0_ub=2., iota1_lb=0.0001, iota1_ub=2., iota2_lb=0.0001, iota2_ub=1., iota3_lb=-2., iota3_ub=2.,
    N=1000, restrict_flag=1, seed=1234, error_log_flag=0, print_flag=false,
-   par_flag=0, par_N=4, type_N=2, pref_only_flag=0)
+   par_flag=0, par_N=4, type_N=2, pref_only_flag=0, bellman_trace=false, bellman_iter=5000, bellman_tol=1e-9)
 
   # run SMM
   estimation_time = @elapsed estimation_result = smm_sobol(data_formatted, paramsprefs, paramsdec, paramsshock,
@@ -411,7 +416,8 @@ function smm_sobol_write_results(path_min, path_store, data_formatted, paramspre
       gamma_b1_ub=gamma_b1_ub, gamma_b2_ub=gamma_b2_ub,
       eps_b_var_ub=eps_b_var_ub, iota0_ub=iota0_ub, iota1_ub=iota1_ub, iota2_ub=iota2_ub, iota3_ub=iota3_ub,
       N=N, restrict_flag=restrict_flag, seed=seed,
-      error_log_flag=error_log_flag, print_flag=print_flag, par_flag=par_flag, par_N=par_N, type_N=type_N, pref_only_flag=pref_only_flag)
+      error_log_flag=error_log_flag, print_flag=print_flag, par_flag=par_flag, par_N=par_N, type_N=type_N, pref_only_flag=pref_only_flag,
+      bellman_trace=bellman_trace, bellman_iter=bellman_iter, bellman_tol=bellman_tol)
 
    # write minimizer to text file
    writedlm(path_min, transpose([estimation_time; estimation_result[1]; estimation_result[2]]), ", ")
@@ -428,7 +434,7 @@ end
 function smm_obj_moments(initial_state_data, target_moments, W::Array, param_vec::Array,
   paramsprefs::ParametersPrefs, paramsdec::ParametersDec, paramsshock::ParametersShock;
   N=1000, restrict_flag=1, seed=1234, error_log_flag=0,
-  print_flag=false, par_flag=0, par_N=4, type_N=2, pref_only_flag=0)
+  print_flag=false, par_flag=0, par_N=4, type_N=2, pref_only_flag=0, bellman_trace=false, bellman_iter=5000, bellman_tol=1e-9)
 
   if print_flag == true
     println(param_vec)
@@ -455,10 +461,12 @@ function smm_obj_moments(initial_state_data, target_moments, W::Array, param_vec
     # simulate dataset and compute moments, whether serial or parallel
     if par_flag == 0
       sim_moments, sim_data, error_log = dgp_moments(initial_state_data, paramsprefs, paramsdec, paramsshock,
-         seed=seed, N=N, restrict_flag=restrict_flag, error_log_flag=error_log_flag, type_N=type_N)
+         seed=seed, N=N, restrict_flag=restrict_flag, error_log_flag=error_log_flag, type_N=type_N,
+         bellman_trace=bellman_trace, bellman_iter=bellman_iter, bellman_tol=bellman_tol)
    elseif par_flag == 1
       sim_moments, sim_data, error_log = dgp_moments_par(initial_state_data, paramsprefs, paramsdec, paramsshock,
-        seed=seed, N=N, restrict_flag=restrict_flag, par_N=par_N, error_log_flag=error_log_flag, type_N=type_N)
+        seed=seed, N=N, restrict_flag=restrict_flag, par_N=par_N, error_log_flag=error_log_flag, type_N=type_N,
+        bellman_trace=bellman_trace, bellman_iter=bellman_iter, bellman_tol=bellman_tol)
    else
       throw(error("par_flag must be 0 or 1"))
    end
@@ -481,11 +489,12 @@ end
 function smm_obj(initial_state_data, target_moments, W::Array, param_vec::Array,
   paramsprefs::ParametersPrefs, paramsdec::ParametersDec, paramsshock::ParametersShock;
   N=1000, restrict_flag=1, seed=1234, error_log_flag=0,
-  print_flag=false, par_flag=0, par_N=4, type_N=2, pref_only_flag=0)
+  print_flag=false, par_flag=0, par_N=4, type_N=2, pref_only_flag=0,
+  bellman_trace=false, bellman_iter=5000, bellman_tol=1e-9)
 
   obj = smm_obj_moments(initial_state_data, target_moments, W, param_vec, paramsprefs, paramsdec, paramsshock,
    N=N, restrict_flag=restrict_flag, seed=seed, error_log_flag=error_log_flag, print_flag=print_flag, par_flag=par_flag, par_N=par_N,
-   type_N=type_N, pref_only_flag=pref_only_flag)[1]
+   type_N=type_N, pref_only_flag=pref_only_flag, bellman_trace=bellman_trace, bellman_iter=bellman_iter, bellman_tol=bellman_tol)[1]
 
    return obj
 
@@ -498,7 +507,8 @@ end
 function smm_obj_testing(data_formatted, param_vec::Array,
   paramsprefs::ParametersPrefs, paramsdec::ParametersDec, paramsshock::ParametersShock;
   N=1000, restrict_flag=1, seed=1234, error_log_flag=0,
-  par_flag=0, par_N=4, type_N=2, pref_only_flag=0)
+  par_flag=0, par_N=4, type_N=2, pref_only_flag=0,
+  bellman_trace=false, bellman_iter=5000, bellman_tol=1e-9)
 
   # generate data moments
   data_moments = moment_gen_dist(data_formatted, restrict_flag=restrict_flag)
@@ -522,7 +532,8 @@ function smm_obj_testing(data_formatted, param_vec::Array,
   # compute objective function
   obj, sim_moments, sim_data, error_log = smm_obj_moments(data_formatted, data_moments, W, param_vec,
     paramsprefs_float, paramsdec_float, paramsshock_float, N=N, restrict_flag=restrict_flag, seed=restrict_flag, error_log_flag=error_log_flag,
-    print_flag=print_flag, par_flag=par_flag, par_N=par_N, type_N=type_N, pref_only_flag=pref_only_flag)
+    print_flag=print_flag, par_flag=par_flag, par_N=par_N, type_N=type_N, pref_only_flag=pref_only_flag,
+    bellman_trace=bellman_trace, bellman_iter=bellman_iter, bellman_tol=bellman_tol)
 
   # find moment that results in maximum error (weighted by W entry)
   if isnan(maximum(((sim_moments[1] - data_moments[1]).^2).*diag(W)))==false
