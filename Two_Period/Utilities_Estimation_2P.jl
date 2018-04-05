@@ -324,19 +324,19 @@ function smm_sobol(data_formatted, paramsprefs::ParametersPrefs, paramsdec::Para
 
       println(string("Iter ",i," of ",sobol_N,": ",param_sobol))
 
-      if param_sobol[1] <= 0. || param_sobol[2] <= 0. || param_sobol[3] < -1. || param_sobol[3] > 1. || (pref_only_flag == 0 && param_sobol[10] <= 0.)
+      if param_sobol[1] <= 0. || param_sobol[2] <= 0. || param_sobol[3] < -1. || param_sobol[3] > 1. || (pref_only_flag == 0 && param_sobol[12] <= 0.)
          obj_val = Inf
          println("skipped")
 
          sobol_storage_i[param_N+1:param_N+39] = fill(Inf,39)
 
       else
-         obj_val, moments = smm_obj_moments(data_formatted, data_moments, W, param_sobol, paramsprefs_float, paramsdec_float, paramsshock_float,
+         obj_val, sim_moments, sim_data, error_log = smm_obj_moments(data_formatted, data_moments, W, param_sobol, paramsprefs_float, paramsdec_float, paramsshock_float,
             N=N, restrict_flag=restrict_flag, seed=seed, error_log_flag=error_log_flag, print_flag=print_flag,
             par_flag=par_flag, par_N=par_N, type_N=type_N, pref_only_flag=pref_only_flag,
             bellman_trace=bellman_trace, bellman_iter=bellman_iter, bellman_tol=bellman_tol)
 
-         sobol_storage_i[param_N+1:param_N+39] = moments
+         sobol_storage_i[param_N+1:param_N+39] = sim_moments[1]
 
       end
 
@@ -444,22 +444,28 @@ function smm_obj_moments(initial_state_data, target_moments, W::Array, param_vec
   if pref_only_flag == 0
      paramsprefs.sigma_B, paramsprefs.sigma_alphaT1, paramsprefs.rho,
      paramsprefs.gamma_0[1], paramsprefs.gamma_0[2],
+     paramsprefs.gamma_y[1], paramsprefs.gamma_y[2],
      paramsprefs.gamma_a[1], paramsprefs.gamma_a[2],
      paramsprefs.gamma_b[1], paramsprefs.gamma_b[2],
      paramsshock.eps_b_var, paramsdec.iota0, paramsdec.iota1, paramsdec.iota2, paramsdec.iota3 = param_vec
+
+     println(pref_Sigma(param_vec[1], param_vec[2], param_vec[3]))
 
      paramsprefs.Sigma = pref_Sigma(param_vec[1], param_vec[2], param_vec[3])
   elseif pref_only_flag == 1
      paramsprefs.sigma_B, paramsprefs.sigma_alphaT1, paramsprefs.rho,
      paramsprefs.gamma_0[1], paramsprefs.gamma_0[2],
+     paramsprefs.gamma_y[1], paramsprefs.gamma_y[2],
      paramsprefs.gamma_a[1], paramsprefs.gamma_a[2],
      paramsprefs.gamma_b[1], paramsprefs.gamma_b[2] = param_vec
+
+     println(pref_Sigma(param_vec[1], param_vec[2], param_vec[3]))
 
      paramsprefs.Sigma = pref_Sigma(param_vec[1], param_vec[2], param_vec[3])
   end
 
   # relevant constraints
-  if param_vec[1] <= 0. || param_vec[2] <= 0. || param_vec[3] < -1. || param_vec[3] > 1. || (pref_only_flag == 0 && param_vec[10] <= 0.)
+  if param_vec[1] <= 0. || param_vec[2] <= 0. || param_vec[3] < -1. || param_vec[3] > 1. || (pref_only_flag == 0 && param_vec[12] <= 0.)
      obj = Inf
   else
     # simulate dataset and compute moments, whether serial or parallel
