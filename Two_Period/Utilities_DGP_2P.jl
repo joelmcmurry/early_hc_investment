@@ -123,7 +123,7 @@ function sim_paths(initial_state_data, paramsshock::ParametersShock, paramsprefs
   # assign types to sample based on type probabilities, proceed by unique states
   for i in 1:length(initial_states_unique[:,1])
     # compute type probabilities
-    type_probs = type_prob(initial_states[i,1], initial_states[i,1], initial_states[i,1], paramsprefs)
+    type_probs = type_prob(initial_states_unique[i,1], initial_states_unique[i,2], initial_states_unique[i,2], paramsprefs)
 
     # find indices of draws with same initial states
     y_match = find(x->x==initial_states_unique[i,1],initial_states[:,1])
