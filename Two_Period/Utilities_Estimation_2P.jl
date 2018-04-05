@@ -252,13 +252,13 @@ end
 
 function smm_sobol(data_formatted, paramsprefs::ParametersPrefs, paramsdec::ParametersDec, paramsshock::ParametersShock;
    sobol_N=10,
-   sigma_B_lb=0.001, sigma_B_ub=10., sigma_alphaT1_lb=0.001, sigma_alphaT1_ub=10.,
+   sigma_B_lb=0.001, sigma_B_ub=2., sigma_alphaT1_lb=0.001, sigma_alphaT1_ub=5.,
    rho_lb=-0.99, rho_ub=0.99,
-   gamma_01_lb=1., gamma_01_ub=2., gamma_02_lb=1., gamma_02_ub=2.,
-   gamma_y1_lb=1., gamma_y1_ub=2., gamma_y2_lb=1., gamma_y2_ub=2.,
-   gamma_a1_lb=1., gamma_a1_ub=2., gamma_a2_lb=1., gamma_a2_ub=2.,
-   gamma_b1_lb=1., gamma_b1_ub=2., gamma_b2_lb=1., gamma_b2_ub=2.,
-   eps_b_var_lb=0.0001, eps_b_var_ub=0.1, iota0_lb=-2., iota0_ub=2., iota1_lb=0.0001, iota1_ub=2., iota2_lb=0.0001, iota2_ub=1., iota3_lb=-2., iota3_ub=2.,
+   gamma_01_lb=-1., gamma_01_ub=2., gamma_02_lb=-1., gamma_02_ub=1.,
+   gamma_y1_lb=-1., gamma_y1_ub=1., gamma_y2_lb=-1., gamma_y2_ub=1.,
+   gamma_a1_lb=-1., gamma_a1_ub=1., gamma_a2_lb=-1., gamma_a2_ub=1.,
+   gamma_b1_lb=-1., gamma_b1_ub=1., gamma_b2_lb=-1., gamma_b2_ub=1.,
+   eps_b_var_lb=0.0001, eps_b_var_ub=1., iota0_lb=-2., iota0_ub=2., iota1_lb=0.0001, iota1_ub=2., iota2_lb=0.0001, iota2_ub=1., iota3_lb=-2., iota3_ub=2.,
    N=1000, restrict_flag=1, seed=1234, error_log_flag=0, print_flag=false,
    par_flag=0, par_N=4, pref_only_flag=0, type_N=2, bellman_trace=false, bellman_iter=5000, bellman_tol=1e-9)
 
@@ -390,13 +390,13 @@ end
 
 function smm_sobol_write_results(path_min, path_store, data_formatted, paramsprefs::ParametersPrefs, paramsdec::ParametersDec, paramsshock::ParametersShock;
    sobol_N=10,
-   sigma_B_lb=0.001, sigma_B_ub=10., sigma_alphaT1_lb=0.001, sigma_alphaT1_ub=10.,
+   sigma_B_lb=0.001, sigma_B_ub=2., sigma_alphaT1_lb=0.001, sigma_alphaT1_ub=5.,
    rho_lb=-0.99, rho_ub=0.99,
-   gamma_01_lb=1., gamma_01_ub=2., gamma_02_lb=1., gamma_02_ub=2.,
-   gamma_y1_lb=1., gamma_y1_ub=2., gamma_y2_lb=1., gamma_y2_ub=2.,
-   gamma_a1_lb=1., gamma_a1_ub=2., gamma_a2_lb=1., gamma_a2_ub=2.,
-   gamma_b1_lb=1., gamma_b1_ub=2., gamma_b2_lb=1., gamma_b2_ub=2.,
-   eps_b_var_lb=0.0001, eps_b_var_ub=0.1, iota0_lb=-2., iota0_ub=2., iota1_lb=0.0001, iota1_ub=2., iota2_lb=0.0001, iota2_ub=1., iota3_lb=-2., iota3_ub=2.,
+   gamma_01_lb=-1., gamma_01_ub=2., gamma_02_lb=-1., gamma_02_ub=1.,
+   gamma_y1_lb=-1., gamma_y1_ub=1., gamma_y2_lb=-1., gamma_y2_ub=1.,
+   gamma_a1_lb=-1., gamma_a1_ub=1., gamma_a2_lb=-1., gamma_a2_ub=1.,
+   gamma_b1_lb=-1., gamma_b1_ub=1., gamma_b2_lb=-1., gamma_b2_ub=1.,
+   eps_b_var_lb=0.0001, eps_b_var_ub=1., iota0_lb=-2., iota0_ub=2., iota1_lb=0.0001, iota1_ub=2., iota2_lb=0.0001, iota2_ub=1., iota3_lb=-2., iota3_ub=2.,
    N=1000, restrict_flag=1, seed=1234, error_log_flag=0, print_flag=false,
    par_flag=0, par_N=4, type_N=2, pref_only_flag=0, bellman_trace=false, bellman_iter=5000, bellman_tol=1e-9)
 
@@ -440,18 +440,22 @@ function smm_obj_moments(initial_state_data, target_moments, W::Array, param_vec
     println(param_vec)
   end
 
-  # set parameters according to guess
+  # set parameters according to guess (and generate var-covar matrix)
   if pref_only_flag == 0
      paramsprefs.sigma_B, paramsprefs.sigma_alphaT1, paramsprefs.rho,
      paramsprefs.gamma_0[1], paramsprefs.gamma_0[2],
      paramsprefs.gamma_a[1], paramsprefs.gamma_a[2],
      paramsprefs.gamma_b[1], paramsprefs.gamma_b[2],
      paramsshock.eps_b_var, paramsdec.iota0, paramsdec.iota1, paramsdec.iota2, paramsdec.iota3 = param_vec
+
+     paramsprefs.Sigma = pref_Sigma(param_vec[1], param_vec[2], param_vec[3])
   elseif pref_only_flag == 1
      paramsprefs.sigma_B, paramsprefs.sigma_alphaT1, paramsprefs.rho,
      paramsprefs.gamma_0[1], paramsprefs.gamma_0[2],
      paramsprefs.gamma_a[1], paramsprefs.gamma_a[2],
      paramsprefs.gamma_b[1], paramsprefs.gamma_b[2] = param_vec
+
+     paramsprefs.Sigma = pref_Sigma(param_vec[1], param_vec[2], param_vec[3])
   end
 
   # relevant constraints
@@ -541,27 +545,6 @@ function smm_obj_testing(data_formatted, param_vec::Array,
   else
     max_error_index = NaN
   end
-
-  # create table for LaTeX
-  # if print_flag==1
-  #   collabels_calibrated = ["Moment","Data","Model"]
-  #
-  #   table_calibrated  = Array(Any,(46,3))
-  #   table_calibrated[1,1:3] = collabels_calibrated
-  #   table_calibrated[2:46,1] = ["Mean ln y, t=1", "Mean ln y, t=2", "Mean ln y, t=3",
-  #       "Mean ln a, t=1", "Mean ln a, t=2", "Mean ln a, t=3", "Mean b, t=1", "Mean b, t=2", "Mean b, t=3",
-  #       "Mean s, t=1", "Mean s, t=2", "Mean s, t=3", "Mean x, t=1", "Mean x, t=2", "Mean x, t=3",
-  #       "SD ln y, t=1", "SD ln y, t=2", "SD ln y, t=3",
-  #           "SD ln a, t=1", "SD ln a, t=2", "SD ln a, t=3", "SD b, t=1", "SD b, t=2", "SD b, t=3",
-  #           "SD s, t=1", "SD s, t=2", "SD s, t=3", "SD x, t=1", "SD x, t=2", "SD x, t=3",
-  #       "Skew ln y, t=1", "Skew ln y, t=2", "Skew ln y, t=3",
-  #           "Skew ln a, t=1", "Skew ln a, t=2", "Skew ln a, t=3", "Skew b, t=1", "Skew b, t=2", "Skew b, t=3",
-  #           "Skew s, t=1", "Skew s, t=2", "Skew s, t=3", "Skew x, t=1", "Skew x, t=2", "Skew x, t=3"]
-  #   table_calibrated[2:46,2] = round(data_moments[1],3)
-  #   table_calibrated[2:46,3] = round(sim_moments[1],3)
-  #
-  #   tabular(table_calibrated)
-  # end
 
   return obj, max_error_index[1], data_moments, sim_moments, sim_data, error_log
 

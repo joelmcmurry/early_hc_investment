@@ -19,14 +19,37 @@ mutable struct ParametersPrefs
   gamma_a :: Array{Float64} ## asset coefficient of mean function
   gamma_b :: Array{Float64} ## hc coefficient of mean function
 
-  function ParametersPrefs(;sigma_B=5., sigma_alphaT1=5., rho=0.,
-    gamma_0=[1., 0.], gamma_y=[0.1, 0.001], gamma_a=[0.1, 0.001], gamma_b=[0.1, 0.001])
+  function ParametersPrefs(;sigma_B=0.5, sigma_alphaT1=5., rho=0.,
+    gamma_0=[0., 0.], gamma_y=[0.1, 0.001], gamma_a=[0.1, 0.001], gamma_b=[0.1, 0.001])
 
     Sigma = [sigma_B^2 rho*sigma_B*sigma_alphaT1; rho*sigma_alphaT1*sigma_B sigma_alphaT1^2]
 
     new(sigma_B, sigma_alphaT1, rho, Sigma, gamma_0, gamma_y, gamma_a, gamma_b)
 
   end
+
+end
+
+mutable struct SimChoiceArg
+   initial_states::Array{Float64}
+   sample_prefs::Array{Float64}
+   shocks_y::Array{Float64}
+   shocks_b::Array{Float64}
+   paramsprefs::ParametersPrefs
+   paramsdec::ParametersDec
+   paramsshock::ParametersShock
+   error_log_flag::Int64
+   bellman_trace::Bool
+   bellman_iter::Int64
+   bellman_tol::Float64
+
+end
+
+# create variance-covariance matrix of preferences
+
+function pref_Sigma(sigma_B::Float64, sigma_alphaT1::Float64, rho::Float64)
+
+  Sigma = [sigma_B^2 rho*sigma_B*sigma_alphaT1; rho*sigma_alphaT1*sigma_B sigma_alphaT1^2]
 
 end
 
@@ -48,6 +71,9 @@ function type_construct(y::Float64, a::Float64, b::Float64, paramsprefs::Paramet
   # compute density of each draw
   type_pdf = pdf(MvNormal(mu_state, paramsprefs.Sigma), type_vec)
 
+  # bound B above 0
+  type_vec[1,:] = exp.(type_vec[1,:])
+
   # bound alpha between 0 and 1
   type_vec[2,:] = 1./(1+exp.(-1.*type_vec[2,:]))
 
@@ -55,21 +81,6 @@ function type_construct(y::Float64, a::Float64, b::Float64, paramsprefs::Paramet
   type_prob = type_pdf./sum(type_pdf)
 
   return type_vec, type_prob
-
-end
-
-mutable struct SimChoiceArg
-   initial_states::Array{Float64}
-   sample_prefs::Array{Float64}
-   shocks_y::Array{Float64}
-   shocks_b::Array{Float64}
-   paramsprefs::ParametersPrefs
-   paramsdec::ParametersDec
-   paramsshock::ParametersShock
-   error_log_flag::Int64
-   bellman_trace::String
-   bellman_iter::Int64
-   bellman_tol::Float64
 
 end
 
@@ -315,8 +326,8 @@ function sim_choices(initial_states::Array{Float64}, sample_prefs::Array{Float64
     y_match = find(x->x==choices_lookup_init_type[n,1], initial_states[:,1])
     a_match = find(x->x==choices_lookup_init_type[n,2], initial_states[:,2])
     b_match = find(x->x==choices_lookup_init_type[n,3], initial_states[:,3])
-    B_match = find(x->x==choices_lookup_init_type[n,5], sample_prefs[:,1])
-    alphaT1_match = find(x->x==choices_lookup_init_type[n,6], sample_prefs[:,2])
+    B_match = find(x->x==choices_lookup_init_type[n,4], sample_prefs[:,1])
+    alphaT1_match = find(x->x==choices_lookup_init_type[n,5], sample_prefs[:,2])
 
     row_match = intersect(y_match, a_match, b_match, alphaT1_match)
 

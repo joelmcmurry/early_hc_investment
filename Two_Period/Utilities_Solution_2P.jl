@@ -274,7 +274,7 @@ function bellman_optim_child!(y::Float64, a::Float64, b::Float64,
   end
 
   # error check, allow to continue and log error if flag is 1
-  if (opt_agent.g_converged == false) || (opt_agent.g_converged == true && opt_agent.iterations == 0)
+  if (opt_agent.g_converged == false)
    if error_log_flag == 0
      error("did not converge: ",string(y," ",a," ",b," ",paramsdec.B," ",paramsdec.alphaT1))
    else
@@ -285,6 +285,5 @@ function bellman_optim_child!(y::Float64, a::Float64, b::Float64,
   end
 
   return -1*opt_agent.minimum, opt_agent.minimizer, opt_agent.g_converged, opt_agent.iterations, error_return_state
-  # return -1*opt_agent.minimum, opt_agent.minimizer, opt_agent.g_converged, opt_agent.iterations
 
 end

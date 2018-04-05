@@ -27,4 +27,4 @@ paramsshock = ParametersShock()
 ## Carry Out SMM Estimation on Sobol Sequence and Write to Output File
 
 smm_sobol_write_results("/home/m/mcmurry2/sobol_test.txt", "/home/m/mcmurry2/sobol_store.csv",
-nlsy79data_formatted, paramsprefs, paramsdec, paramsshock, sobol_N=10, par_flag=1, par_N=8, error_log_flag=1)
+nlsy79data_formatted, paramsprefs, paramsdec, paramsshock, sobol_N=100, par_flag=1, par_N=8, error_log_flag=1)

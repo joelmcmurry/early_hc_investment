@@ -22,42 +22,44 @@ paramsshock = ParametersShock()
 
 #= Test DGP and Tinker with Parameters =#
 
-paramsprefs.sigma_B = 5.
-paramsprefs.sigma_alphaT1 = 5.
-paramsprefs.gamma_0 = [0.1, 0.]
+paramsprefs = ParametersPrefs(sigma_B=0.5, sigma_alphaT1=5., rho=0.)
+
+paramsprefs.gamma_0 = [0., 0.]
 paramsprefs.gamma_y = [0.1, 0.001]
 paramsprefs.gamma_a = [0.1, 0.001]
 paramsprefs.gamma_b = [0.1, 0.001]
 
 test_paths = sim_paths(initial_state_data, paramsshock, paramsprefs, seed=1234, N=1000, type_N=2)
 
-@elapsed test_choices = sim_choices(test_paths[1], test_paths[2], test_paths[3], test_paths[4], paramsprefs, paramsdec, paramsshock, bellman_tol=1e-1, bellman_iter=10000)
+@elapsed test_choices = sim_choices(test_paths[1], test_paths[2], test_paths[3], test_paths[4],
+  paramsprefs, paramsdec, paramsshock, bellman_tol=1e-9, bellman_iter=5000, error_log_flag=0)
 
 test_mom = moment_gen_dist(test_choices)
 
 ## Individual State Convergence Testing
 
-y_test = 38732.99
-a_test = 1.
-b_test = 13.
-test_B = -5.419
-test_alphaT1 = 0.7668
+y_test = 261764.86
+a_test = 6847.72
+b_test = 29.
+test_B = 1.328
+test_alphaT1 = 0.96869
 
 paramsdec_test = ParametersDec(B=test_B, alphaT1=test_alphaT1)
 
 test_solve = bellman_optim_child!(y_test, a_test, b_test, paramsdec_test, paramsshock,
-  aprime_start=1., x_start=1., opt_code="neldermead", error_log_flag=0, opt_trace=true, opt_iter=5000, opt_tol=1e-7)
+  aprime_start=1., x_start=1., opt_code="neldermead", error_log_flag=0,
+  opt_trace=true, opt_iter=5000, opt_tol=1e-7)
 
 #= Testing Moment Generation =#
 
-@elapsed test_mom = dgp_moments(initial_state_data, paramsprefs, paramsdec, paramsshock, type_N=2)
+@elapsed test_mom = dgp_moments(initial_state_data, paramsprefs, paramsdec, paramsshock, type_N=2, N=1000)
 
-@elapsed test_mom_par = dgp_moments_par(initial_state_data, paramsprefs, paramsdec, paramsshock, par_N=4, type_N=2)
+@elapsed test_mom_par = dgp_moments_par(initial_state_data, paramsprefs, paramsdec, paramsshock, par_N=4, type_N=2, N=1000)
 
 #= Testing Sobol SMM/Write =#
 
 @elapsed smm_sobol_write_results("sobol_test.txt", "sobol_store.csv", nlsy79data_formatted, paramsprefs, paramsdec, paramsshock,
-  sobol_N=50, par_flag=1, par_N=4, print_flag=0)
+  sobol_N=5, par_flag=1, par_N=4, print_flag=0)
 
 #= Testing SMM Objective Function or Particular Parameter Vector =#
 
