@@ -22,12 +22,17 @@ paramsshock = ParametersShock()
 
 #= Test DGP and Tinker with Parameters =#
 
-paramsprefs = ParametersPrefs(sigma_B=0.5, sigma_alphaT1=5., rho=0.)
+paramsprefs = ParametersPrefs(sigma_B=0.297727, sigma_alphaT1=3.86741, rho=0.139219)
 
-paramsprefs.gamma_0 = [0., 0.]
-paramsprefs.gamma_y = [0.1, 0.001]
-paramsprefs.gamma_a = [0.1, 0.001]
-paramsprefs.gamma_b = [0.1, 0.001]
+paramsprefs.gamma_0 = [-0.460938, 0.171875]
+paramsprefs.gamma_y = [0.984375, -0.953125]
+paramsprefs.gamma_a = [0.640625, 0.734375]
+paramsprefs.gamma_b = [0.984375, -0.890625]
+paramsshock.eps_b_var = 0.445368
+paramsdec.iota0 = -0.09375
+paramsdec.iota1 = 0.921929
+paramsdec.iota2 = 0.882824
+paramsdec.iota3 = -1.15625
 
 test_paths = sim_paths(initial_state_data, paramsshock, paramsprefs, seed=1234, N=1000, type_N=2)
 
@@ -36,13 +41,13 @@ test_paths = sim_paths(initial_state_data, paramsshock, paramsprefs, seed=1234, 
 
 test_mom = moment_gen_dist(test_choices)
 
-## Individual State Convergence Testing
+## Individual State/Pref Testing
 
-y_test = 261764.86
-a_test = 6847.72
-b_test = 29.
-test_B = 1.328
-test_alphaT1 = 0.96869
+y_test = 1.29365e5
+a_test = 1369.54
+b_test = 38.
+test_B = 6.17113e16
+test_alphaT1 = 9.38399e-20
 
 paramsdec_test = ParametersDec(B=test_B, alphaT1=test_alphaT1)
 
@@ -65,11 +70,9 @@ test_solve = bellman_optim_child!(y_test, a_test, b_test, paramsdec_test, params
 
 # SMM optimizer
 
-smm_1e1_min = [7.440572977878828, 3.1714410121105088, 0.6138021146248615, 0.05978069786455791,
-1.3517041360143274, 1.435700915256765, 1.3325181388182585,
-2.1748539567190504, 0.7218463209945897, 1.5594413250003598, 1.983579896628608,
-2.0016641984824037, 1.0043868128423774, 1.9383126352689801, 1.0755957319412595,
-0.03114075090791482, 1.676017468842615, 0.10041386658424886, 0.05408924598776115, 0.04679703798950916]
+sobol_100 = [0.83651953125, 3.6916679687499996, -0.982265625, 0.08203125, 0.08671875000000001, 0.052343749999999994,
+0.036718749999999994, 0.016406249999999997, 0.0023437500000000056, 0.033593750000000006,
+0.007031250000000003, 0.464897265625, 1.828125, 0.960989453125, 0.980470703125, -0.640625
 
 @elapsed smm_obj_par = smm_obj_testing(nlsy79data_formatted, smm_1e1_min, paramsprefs, paramsdec, paramsshock,
   par_flag=1, par_N=4)
@@ -83,6 +86,14 @@ mom_comp2 = [smm_obj_par[3][1][10:15] smm_obj_par[3][2][10:15] smm_obj_par[4][1]
 mom_comp3 = [smm_obj_par[3][1][16:27] smm_obj_par[3][2][16:27] smm_obj_par[4][1][16:27]]
 
 mom_comp4 = [smm_obj_par[3][1][28:39] smm_obj_par[3][2][28:39] smm_obj_par[4][1][28:39]]
+
+#= Test Parameters Throwing Errors in SMM =#
+
+param_trouble = [0.297727, 3.86741, 0.139219, -0.460938, 0.171875, 0.984375, -0.953125,
+0.640625, 0.734375, 0.984375, -0.890625, 0.445368, -0.09375, 0.921929, 0.882824, -1.15625]
+
+@elapsed smm_obj_trouble = smm_obj_testing(nlsy79data_formatted, param_trouble, paramsprefs, paramsdec, paramsshock,
+  par_flag=0, par_N=4, error_log_flag=1)
 
 #= "Indetifiation" =#
 

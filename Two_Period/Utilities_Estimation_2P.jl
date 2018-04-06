@@ -260,7 +260,8 @@ function smm_sobol(data_formatted, paramsprefs::ParametersPrefs, paramsdec::Para
    gamma_b1_lb=-1., gamma_b1_ub=1., gamma_b2_lb=-1., gamma_b2_ub=1.,
    eps_b_var_lb=0.0001, eps_b_var_ub=1., iota0_lb=-2., iota0_ub=2., iota1_lb=0.0001, iota1_ub=2., iota2_lb=0.0001, iota2_ub=1., iota3_lb=-2., iota3_ub=2.,
    N=1000, restrict_flag=1, seed=1234, error_log_flag=0, print_flag=false,
-   par_flag=0, par_N=4, pref_only_flag=0, type_N=2, bellman_trace=false, bellman_iter=5000, bellman_tol=1e-9)
+   par_flag=0, par_N=4, pref_only_flag=0, type_N=2, bellman_trace=false, bellman_iter=5000, bellman_tol=1e-9,
+   B_lim=1000., alphaT1_lim_lb=0.001, alphaT1_lim_ub=0.999)
 
    # store number of parameters
    if pref_only_flag == 0
@@ -324,7 +325,17 @@ function smm_sobol(data_formatted, paramsprefs::ParametersPrefs, paramsdec::Para
 
       println(string("Iter ",i," of ",sobol_N,": ",param_sobol))
 
-      if param_sobol[1] <= 0. || param_sobol[2] <= 0. || param_sobol[3] < -1. || param_sobol[3] > 1. || (pref_only_flag == 0 && param_sobol[12] <= 0.)
+      # check is preference distribution is permissible
+      median_expected_prefs = sobol_draw_check(data_formatted, [param_sobol[4], param_sobol[5]], [param_sobol[6], param_sobol[7]],
+         [param_sobol[8], param_sobol[9]], [param_sobol[10], param_sobol[11]])
+
+      if median_expected_prefs[1] > B_lim || median_expected_prefs[2] < alphaT1_lim_lb || median_expected_prefs[2] > alphaT1_lim_ub
+         pref_error_flag = 1
+      else
+         pref_error_flag = 0
+      end
+
+      if param_sobol[1] <= 0. || param_sobol[2] <= 0. || param_sobol[3] < -1. || param_sobol[3] > 1. || (pref_only_flag == 0 && param_sobol[12] <= 0.) || pref_error_flag == 1
          obj_val = Inf
          println("skipped")
 
@@ -353,6 +364,30 @@ function smm_sobol(data_formatted, paramsprefs::ParametersPrefs, paramsdec::Para
    end
 
   return min_obj_val, min_obj_params, sobol_storage
+
+end
+
+# check if mean preference draws for median household (in data) are permissible
+
+function sobol_draw_check(data_formatted, gamma_0::Array{Float64}, gamma_y::Array{Float64}, gamma_a::Array{Float64}, gamma_b::Array{Float64})
+
+   # for computational reasons, set factor by which we divide states
+   y_div = 100000.
+   a_div = 10000.
+   b_div= 1.
+
+   # calculate median state
+   y_med = median(data_formatted[1][1])
+   a_med = median(data_formatted[2][1])
+   b_med = median(data_formatted[3][1])
+
+   # calculate mean preferences for median state
+   mu_state = gamma_0 + gamma_y*y_med/y_div + gamma_a*a_med/a_div + gamma_b*b_med/b_div
+
+   # transform
+   mean_prefs = [exp(mu_state[1]), 1/(1+exp(-mu_state[2]))]
+
+   return mean_prefs
 
 end
 
@@ -398,7 +433,8 @@ function smm_sobol_write_results(path_min, path_store, data_formatted, paramspre
    gamma_b1_lb=-1., gamma_b1_ub=1., gamma_b2_lb=-1., gamma_b2_ub=1.,
    eps_b_var_lb=0.0001, eps_b_var_ub=1., iota0_lb=-2., iota0_ub=2., iota1_lb=0.0001, iota1_ub=2., iota2_lb=0.0001, iota2_ub=1., iota3_lb=-2., iota3_ub=2.,
    N=1000, restrict_flag=1, seed=1234, error_log_flag=0, print_flag=false,
-   par_flag=0, par_N=4, type_N=2, pref_only_flag=0, bellman_trace=false, bellman_iter=5000, bellman_tol=1e-9)
+   par_flag=0, par_N=4, type_N=2, pref_only_flag=0, bellman_trace=false, bellman_iter=5000, bellman_tol=1e-9,
+   B_lim=1000., alphaT1_lim_lb=0.001, alphaT1_lim_ub=0.999)
 
   # run SMM
   estimation_time = @elapsed estimation_result = smm_sobol(data_formatted, paramsprefs, paramsdec, paramsshock,
@@ -417,7 +453,7 @@ function smm_sobol_write_results(path_min, path_store, data_formatted, paramspre
       eps_b_var_ub=eps_b_var_ub, iota0_ub=iota0_ub, iota1_ub=iota1_ub, iota2_ub=iota2_ub, iota3_ub=iota3_ub,
       N=N, restrict_flag=restrict_flag, seed=seed,
       error_log_flag=error_log_flag, print_flag=print_flag, par_flag=par_flag, par_N=par_N, type_N=type_N, pref_only_flag=pref_only_flag,
-      bellman_trace=bellman_trace, bellman_iter=bellman_iter, bellman_tol=bellman_tol)
+      bellman_trace=bellman_trace, bellman_iter=bellman_iter, bellman_tol=bellman_tol, B_lim=B_lim, alphaT1_lim_lb=alphaT1_lim_lb, alphaT1_lim_ub)
 
    # write minimizer to text file
    writedlm(path_min, transpose([estimation_time; estimation_result[1]; estimation_result[2]]), ", ")
@@ -429,7 +465,7 @@ end
 
 ## Objecive Function for SMM Optimization, modifies parameters in place and takes target moments as argument
 
-# jointly estimate all parameters, returning both objective function and simulated moments
+# jointly estimate all parameters, returning both objective function and simulated data/moments
 
 function smm_obj_moments(initial_state_data, target_moments, W::Array, param_vec::Array,
   paramsprefs::ParametersPrefs, paramsdec::ParametersDec, paramsshock::ParametersShock;
@@ -449,9 +485,7 @@ function smm_obj_moments(initial_state_data, target_moments, W::Array, param_vec
      paramsprefs.gamma_b[1], paramsprefs.gamma_b[2],
      paramsshock.eps_b_var, paramsdec.iota0, paramsdec.iota1, paramsdec.iota2, paramsdec.iota3 = param_vec
 
-     println(pref_Sigma(param_vec[1], param_vec[2], param_vec[3]))
-
-     paramsprefs.Sigma = pref_Sigma(param_vec[1], param_vec[2], param_vec[3])
+     paramsprefs.Sigma = Symmetric(pref_Sigma(param_vec[1], param_vec[2], param_vec[3]))
   elseif pref_only_flag == 1
      paramsprefs.sigma_B, paramsprefs.sigma_alphaT1, paramsprefs.rho,
      paramsprefs.gamma_0[1], paramsprefs.gamma_0[2],
@@ -459,9 +493,7 @@ function smm_obj_moments(initial_state_data, target_moments, W::Array, param_vec
      paramsprefs.gamma_a[1], paramsprefs.gamma_a[2],
      paramsprefs.gamma_b[1], paramsprefs.gamma_b[2] = param_vec
 
-     println(pref_Sigma(param_vec[1], param_vec[2], param_vec[3]))
-
-     paramsprefs.Sigma = pref_Sigma(param_vec[1], param_vec[2], param_vec[3])
+     paramsprefs.Sigma = Symmetric(pref_Sigma(param_vec[1], param_vec[2], param_vec[3]))
   end
 
   # relevant constraints
@@ -494,7 +526,7 @@ function smm_obj_moments(initial_state_data, target_moments, W::Array, param_vec
 
 end
 
-# return only objectie function
+# return only objective function
 
 function smm_obj(initial_state_data, target_moments, W::Array, param_vec::Array,
   paramsprefs::ParametersPrefs, paramsdec::ParametersDec, paramsshock::ParametersShock;
@@ -518,7 +550,7 @@ function smm_obj_testing(data_formatted, param_vec::Array,
   paramsprefs::ParametersPrefs, paramsdec::ParametersDec, paramsshock::ParametersShock;
   N=1000, restrict_flag=1, seed=1234, error_log_flag=0,
   par_flag=0, par_N=4, type_N=2, pref_only_flag=0,
-  bellman_trace=false, bellman_iter=5000, bellman_tol=1e-9)
+  bellman_trace=false, bellman_iter=5000, bellman_tol=1e-9, print_flag=false)
 
   # generate data moments
   data_moments = moment_gen_dist(data_formatted, restrict_flag=restrict_flag)
@@ -571,7 +603,6 @@ function plot_series(param_grid, moment_series, param_name, moment_name)
   title(string(moment_name, " Varying ", param_name))
 
 end
-
 
 # plot moments varying single parameter
 

@@ -49,13 +49,14 @@ end
 
 function pref_Sigma(sigma_B::Float64, sigma_alphaT1::Float64, rho::Float64)
 
-  Sigma = [sigma_B^2 rho*sigma_B*sigma_alphaT1; rho*sigma_alphaT1*sigma_B sigma_alphaT1^2]
+  Sigma = Symmetric([sigma_B^2 rho*sigma_B*sigma_alphaT1; rho*sigma_alphaT1*sigma_B sigma_alphaT1^2])
 
 end
 
 # draw state-specific types
 
-function type_construct(y::Float64, a::Float64, b::Float64, paramsprefs::ParametersPrefs; seed=1234, type_N=2)
+function type_construct(y::Float64, a::Float64, b::Float64, paramsprefs::ParametersPrefs; seed=1234, type_N=2,
+  B_lim=1000., alphaT1_lim_lb=0.001, alphaT1_lim_ub=0.999)
 
   # for computational reasons, set factor by which we divide states
   y_div = 100000.
@@ -79,6 +80,11 @@ function type_construct(y::Float64, a::Float64, b::Float64, paramsprefs::Paramet
 
   # transform to probabilities
   type_prob = type_pdf./sum(type_pdf)
+
+  # trim outliers
+  type_vec[1,:] = min.(type_vec[1,:], B_lim)
+  type_vec[2,:] = max.(type_vec[2,:], alphaT1_lim_lb)
+  type_vec[2,:] = min.(type_vec[2,:], alphaT1_lim_ub)
 
   return type_vec, type_prob
 
@@ -293,6 +299,8 @@ function sim_choices(initial_states::Array{Float64}, sample_prefs::Array{Float64
       paramsdec.alphaT1 = drawn_prefs[2]
       paramsdec.alphaT2 = 1. - drawn_prefs[2]
 
+      # println(initial_states_unique[n,1:3], drawn_prefs)
+
       # solve childhood period decisions
       V0_type, choices0_type, converged_check, iterations_taken, error_log_state = bellman_optim_child!(initial_states_unique[n,1],
         initial_states_unique[n,2], initial_states_unique[n,3], paramsdec, paramsshock,
@@ -317,7 +325,6 @@ function sim_choices(initial_states::Array{Float64}, sample_prefs::Array{Float64
     end
 
   end
-
 
   # loop through sample and assign decision rules and compute state evolution
   for n in 1:N_unique
