@@ -573,7 +573,7 @@ function smm_obj_testing(data_formatted, param_vec::Array,
 
   # compute objective function
   obj, sim_moments, sim_data, error_log = smm_obj_moments(data_formatted, data_moments, W, param_vec,
-    paramsprefs_float, paramsdec_float, paramsshock_float, N=N, restrict_flag=restrict_flag, seed=restrict_flag, error_log_flag=error_log_flag,
+    paramsprefs_float, paramsdec_float, paramsshock_float, N=N, restrict_flag=restrict_flag, seed=seed, error_log_flag=error_log_flag,
     print_flag=print_flag, par_flag=par_flag, par_N=par_N, type_N=type_N, pref_only_flag=pref_only_flag,
     bellman_trace=bellman_trace, bellman_iter=bellman_iter, bellman_tol=bellman_tol)
 

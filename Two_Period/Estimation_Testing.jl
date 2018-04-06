@@ -22,17 +22,21 @@ paramsshock = ParametersShock()
 
 #= Test DGP and Tinker with Parameters =#
 
-paramsprefs = ParametersPrefs(sigma_B=0.297727, sigma_alphaT1=3.86741, rho=0.139219)
+test_params = [0.83651953125, 3.6916679687499996, -0.982265625, 0.08203125, 0.08671875000000001, 0.052343749999999994,
+0.036718749999999994, 0.016406249999999997, 0.0023437500000000056, 0.033593750000000006,
+0.007031250000000003, 0.464897265625, 1.828125, 0.960989453125, 0.980470703125, -0.640625]
 
-paramsprefs.gamma_0 = [-0.460938, 0.171875]
-paramsprefs.gamma_y = [0.984375, -0.953125]
-paramsprefs.gamma_a = [0.640625, 0.734375]
-paramsprefs.gamma_b = [0.984375, -0.890625]
-paramsshock.eps_b_var = 0.445368
-paramsdec.iota0 = -0.09375
-paramsdec.iota1 = 0.921929
-paramsdec.iota2 = 0.882824
-paramsdec.iota3 = -1.15625
+paramsprefs = ParametersPrefs(sigma_B=test_params[1], sigma_alphaT1=test_params[2], rho=test_params[3])
+
+paramsprefs.gamma_0 = [test_params[4], test_params[5]]
+paramsprefs.gamma_y = [test_params[6], test_params[7]]
+paramsprefs.gamma_a = [test_params[8], test_params[9]]
+paramsprefs.gamma_b = [test_params[10], test_params[11]]
+paramsshock.eps_b_var = test_params[12]
+paramsdec.iota0 = test_params[13]
+paramsdec.iota1 = test_params[14]
+paramsdec.iota2 = test_params[15]
+paramsdec.iota3 = test_params[16]
 
 test_paths = sim_paths(initial_state_data, paramsshock, paramsprefs, seed=1234, N=1000, type_N=2)
 
@@ -40,6 +44,16 @@ test_paths = sim_paths(initial_state_data, paramsshock, paramsprefs, seed=1234, 
   paramsprefs, paramsdec, paramsshock, bellman_tol=1e-9, bellman_iter=5000, error_log_flag=0)
 
 test_mom = moment_gen_dist(test_choices)
+
+data_mom = moment_gen_dist(nlsy79data_formatted)
+
+test_mom1 = [data_mom[1][1:9] test_mom[2][1:9] test_mom[1][1:9]]
+
+test_mom2 = [data_mom[1][10:15] test_mom[2][10:15] test_mom[1][10:15]]
+
+test_mom3 = [data_mom[1][16:27] test_mom[2][16:27] test_mom[1][16:27]]
+
+test_mom4 = [data_mom[1][28:39] test_mom[2][28:39] test_mom[1][28:39]]
 
 ## Individual State/Pref Testing
 
@@ -72,10 +86,10 @@ test_solve = bellman_optim_child!(y_test, a_test, b_test, paramsdec_test, params
 
 sobol_100 = [0.83651953125, 3.6916679687499996, -0.982265625, 0.08203125, 0.08671875000000001, 0.052343749999999994,
 0.036718749999999994, 0.016406249999999997, 0.0023437500000000056, 0.033593750000000006,
-0.007031250000000003, 0.464897265625, 1.828125, 0.960989453125, 0.980470703125, -0.640625
+0.007031250000000003, 0.464897265625, 1.828125, 0.960989453125, 0.980470703125, -0.640625]
 
-@elapsed smm_obj_par = smm_obj_testing(nlsy79data_formatted, smm_1e1_min, paramsprefs, paramsdec, paramsshock,
-  par_flag=1, par_N=4)
+@elapsed smm_obj_par = smm_obj_testing(nlsy79data_formatted, sobol_100, paramsprefs, paramsdec, paramsshock,
+  par_flag=0, par_N=4, type_N=2, N=1000)
 
 # read moments more easily
 
