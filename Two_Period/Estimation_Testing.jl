@@ -40,7 +40,11 @@ sobol_25k = [1.303497314453125, 1.089263916015625, -0.857647705078125, -0.030355
 0.06196594238281253, -0.031182861328125006,
 0.04096771240234375, -7.0474853515625, 0.6693145751953125, 1.73492462158203127, -0.224908447265625]
 
-test_params = deepcopy(sobol_25k)
+sobol_100k = [1.0044631958007812, 2.1470413208007812, -0.7989120483398438, 0.11725234985351565, 0.0015121459960937556,
+0.0876487731933594, -0.0054916381835937444, 0.0008796691894531333, -0.014323425292968747, 0.04067306518554689, 19836425781252776e-21,
+0.2679761505126953, -3.0971221923828125, 0.3985466003417969, 0.9536629486083984, -0.12674713134765625]
+
+test_params = deepcopy(sobol_100k)
 
 paramsprefs = ParametersPrefs(sigma_B=test_params[1], sigma_alphaT1=test_params[2], rho=test_params[3])
 
@@ -73,24 +77,28 @@ test_mom4 = [data_mom[1][28:39] test_mom[2][28:39] test_mom[1][28:39]]
 
 ## Individual State/Pref Testing
 
-n=2
+n=200
 
 y_test = nlsy79data_formatted[1][1][n]
 a_test = nlsy79data_formatted[2][1][n]
 b_test = nlsy79data_formatted[3][1][n]
-test_B = 200.
-test_alphaT1 = 0.005
-test_alphaT2 = 0.5
+
+test_B = 1.
+test_alphaT1 = 6.4
+test_alphaT2 = 80.
 
 paramsdec_test = ParametersDec(B=test_B, alphaT1=test_alphaT1, iota2=0.11)
+paramsdec_test.alphaT2 = test_alphaT2
 
-choices_vary_param("alphaT1", y_test, a_test, b_test, paramsdec_test, paramsshock, 0.001, 0.05, param_N=20)
+bellman_optim_child!(y_test, a_test, b_test, paramsdec_test, paramsshock)
+
+# vary params
+
+choices_vary_param("alphaT1", y_test, a_test, b_test, paramsdec_test, paramsshock, 0.5, 7., param_N=50)
 
 aprime_actual = nlsy79data_formatted[2][2][n]
 s_actual = nlsy79data_formatted[4][1][n]
 x_actual = nlsy79data_formatted[5][1][n]
-
-bellman_optim_child!(y_test, a_test, b_test, paramsdec_test, paramsshock)
 
 # mean next-period income
 y_annual_test = Y_evol(y_test, paramsdec.rho_y, 0.)

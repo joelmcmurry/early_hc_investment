@@ -301,10 +301,10 @@ function t_opt_vary_parma(param_vary::String, y_annual, a, b, paramsdec::Paramet
   for n in 1:param_N
     if param_vary == "alphaT1"
       paramsdec.alphaT1 = param_grid[n]
-      paramsdec.alphaT2 = 1- paramsdec.alphaT1
+      # paramsdec.alphaT2 = 1- paramsdec.alphaT1
     elseif param_vary == "alphaT2"
       paramsdec.alphaT2 = param_grid[n]
-      paramsdec.alphaT1 = 1 - paramsdec.alphaT2
+      # paramsdec.alphaT1 = 1 - paramsdec.alphaT2
     elseif param_vary == "B"
       paramsdec.B = param_grid[n]
     end
@@ -337,10 +337,10 @@ function choices_vary_param(param_vary::String, y, a, b, paramsdec::ParametersDe
   for n in 1:param_N
     if param_vary == "alphaT1"
       paramsdec.alphaT1 = param_grid[n]
-      paramsdec.alphaT2 = 1- paramsdec.alphaT1
+      # paramsdec.alphaT2 = 1- paramsdec.alphaT1
     elseif param_vary == "alphaT2"
       paramsdec.alphaT2 = param_grid[n]
-      paramsdec.alphaT1 = 1 - paramsdec.alphaT2
+      # paramsdec.alphaT1 = 1 - paramsdec.alphaT2
     elseif param_vary == "B"
       paramsdec.B = param_grid[n]
     end
