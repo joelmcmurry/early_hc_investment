@@ -31,8 +31,8 @@ mutable struct ParametersDec
 
   function ParametersDec(;beta=0.5, r=0.18, B=1.,
     alphaT1=0.5, alphaT2=1-alphaT1,
-    iota0=2.97, iota1=0.27,
-    iota2=0.02, iota3=0.,
+    iota0=2.6, iota1=0.25,
+    iota2=0.062, iota3=0.,
     beta0=4.134, beta1=0.03, beta2=0.003, rho_y=1.002)
 
     new(beta, r, B, alphaT1, alphaT2, iota0, iota1, iota2, iota3, beta0, beta1, beta2, rho_y)
@@ -210,7 +210,7 @@ function EV_T(y_annual::Float64, a::Float64, b::Float64, paramsdec::ParametersDe
   t_star = max(t_opt(y_annual, a, b, paramsdec.alphaT1, paramsdec.alphaT2,
     paramsdec.beta0, paramsdec.beta1, paramsdec.beta2, paramsdec.r), 1.0)
 
-  Value = paramsdec.B*u_T(y_annual, a, b, paramsdec.alphaT1, paramsdec.alphaT2,
+  Value = u_T(y_annual, a, b, paramsdec.alphaT1, paramsdec.alphaT2,
     paramsdec.beta0, paramsdec.beta1, paramsdec.beta2, t_star, paramsdec.r)
 
   return Value
@@ -218,8 +218,6 @@ function EV_T(y_annual::Float64, a::Float64, b::Float64, paramsdec::ParametersDe
 end
 
 #= Bellman Operators =#
-
-## First Period
 
 function bellman_optim_child!(y::Float64, a::Float64, b::Float64,
   paramsdec::ParametersDec, paramsshock::ParametersShock;
@@ -250,7 +248,7 @@ function bellman_optim_child!(y::Float64, a::Float64, b::Float64,
        Vprime_array_exact[j] = EV_T(y_b_array[j,1], choices[1], y_b_array[j,2], paramsdec)
      end
 
-     value_out = log(c) + paramsdec.beta*dot(Vprime_array_exact,paramsshock.eps_joint_dist_discrete)
+     value_out = 6.*log(c/6.) + paramsdec.beta*paramsdec.B*dot(Vprime_array_exact,paramsshock.eps_joint_dist_discrete)
 
    else
 
@@ -285,5 +283,100 @@ function bellman_optim_child!(y::Float64, a::Float64, b::Float64,
   end
 
   return -1*opt_agent.minimum, opt_agent.minimizer, opt_agent.g_converged, opt_agent.iterations, error_return_state
+
+end
+
+#= Solution Testing Functions =#
+
+# tuition as function of parameters
+
+function t_opt_vary_parma(param_vary::String, y_annual, a, b, paramsdec::ParametersDec, param_min, param_max; param_N=10)
+
+  # store results
+  t_opt_vec = zeros(param_N)
+
+  # make parameter grid
+  param_grid = linspace(param_min, param_max, param_N)
+
+  for n in 1:param_N
+    if param_vary == "alphaT1"
+      paramsdec.alphaT1 = param_grid[n]
+      paramsdec.alphaT2 = 1- paramsdec.alphaT1
+    elseif param_vary == "alphaT2"
+      paramsdec.alphaT2 = param_grid[n]
+      paramsdec.alphaT1 = 1 - paramsdec.alphaT2
+    elseif param_vary == "B"
+      paramsdec.B = param_grid[n]
+    end
+
+    t_opt_vec[n] = t_opt(y_annual, a, b, paramsdec.alphaT1, paramsdec.alphaT2,
+    paramsdec.beta0, paramsdec.beta1, paramsdec.beta2, paramsdec.r)
+  end
+
+  t_plot = figure()
+  plot(param_grid, t_opt_vec)
+  xlabel(param_vary)
+  ylabel("tuition")
+  ax = PyPlot.gca()
+  ax[:legend](loc="lower right")
+
+end
+
+# choices as functions of parameters
+
+function choices_vary_param(param_vary::String, y, a, b, paramsdec::ParametersDec, paramsshock::ParametersShock, param_min, param_max; param_N=10)
+
+  # store results
+  aprime_vec = zeros(param_N)
+  x_vec = zeros(param_N)
+  t_mean_vec = zeros(param_N)
+
+  # make parameter grid
+  param_grid = linspace(param_min, param_max, param_N)
+
+  for n in 1:param_N
+    if param_vary == "alphaT1"
+      paramsdec.alphaT1 = param_grid[n]
+      paramsdec.alphaT2 = 1- paramsdec.alphaT1
+    elseif param_vary == "alphaT2"
+      paramsdec.alphaT2 = param_grid[n]
+      paramsdec.alphaT1 = 1 - paramsdec.alphaT2
+    elseif param_vary == "B"
+      paramsdec.B = param_grid[n]
+    end
+
+    aprime_vec[n], x_vec[n] = bellman_optim_child!(y, a, b, paramsdec, paramsshock,
+      aprime_start=1., x_start=1., opt_code="neldermead", error_log_flag=0, opt_trace=false, opt_iter=5000, opt_tol=1e-9)[2]
+
+    # compute mean next period income and HC and calculate mean tuition paid
+    yprime_mean = Y_evol(y, paramsdec.rho_y, 0.)
+    bprime_mean = HC_prod(b, x_vec[n], 0., paramsdec.iota0, paramsdec.iota1, paramsdec.iota2, paramsdec.iota3)
+
+    # compute mean tuition
+    t_mean_vec[n] = t_opt(yprime_mean, aprime_vec[n], bprime_mean, paramsdec.alphaT1, paramsdec.alphaT2,
+      paramsdec.beta0, paramsdec.beta1, paramsdec.beta2, paramsdec.r)
+
+  end
+
+  aprime_plot = figure()
+  plot(param_grid, aprime_vec)
+  xlabel(param_vary)
+  ylabel("aprime")
+  ax = PyPlot.gca()
+  ax[:legend](loc="lower right")
+
+  x_plot = figure()
+  plot(param_grid, x_vec)
+  xlabel(param_vary)
+  ylabel("x")
+  ax = PyPlot.gca()
+  ax[:legend](loc="lower right")
+
+  t_plot = figure()
+  plot(param_grid, t_mean_vec)
+  xlabel(param_vary)
+  ylabel("mean tuition")
+  ax = PyPlot.gca()
+  ax[:legend](loc="lower right")
 
 end

@@ -56,7 +56,7 @@ end
 # draw state-specific types
 
 function type_construct(y::Float64, a::Float64, b::Float64, paramsprefs::ParametersPrefs; seed=1234, type_N=2,
-  B_lim=1000., alphaT1_lim_lb=0.001, alphaT1_lim_ub=0.999)
+  B_lim=1000., alphaT1_lim_lb=0.001, alphaT1_lim_ub=0.999, mean_flag=0)
 
   # for computational reasons, set factor by which we divide states
   y_div = 100000.
@@ -66,8 +66,12 @@ function type_construct(y::Float64, a::Float64, b::Float64, paramsprefs::Paramet
   # compute mean of joint distribution given type
   mu_state = paramsprefs.gamma_0 + paramsprefs.gamma_y*y/y_div + paramsprefs.gamma_a*a/a_div + paramsprefs.gamma_b*b/b_div
 
-  # draw N types
-  srand(seed); type_vec = rand(MvNormal(mu_state, paramsprefs.Sigma), type_N)
+  # draw N types or return mean draws only
+  if mean_flag == 0
+    srand(seed); type_vec = rand(MvNormal(mu_state, paramsprefs.Sigma), type_N)
+  elseif mean_flag == 1
+    type_vec = mu_state
+  end
 
   # compute density of each draw
   type_pdf = pdf(MvNormal(mu_state, paramsprefs.Sigma), type_vec)

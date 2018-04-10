@@ -254,10 +254,10 @@ function smm_sobol(data_formatted, paramsprefs::ParametersPrefs, paramsdec::Para
    sobol_N=10,
    sigma_B_lb=0.001, sigma_B_ub=2., sigma_alphaT1_lb=0.001, sigma_alphaT1_ub=5.,
    rho_lb=-0.99, rho_ub=0.99,
-   gamma_01_lb=-1., gamma_01_ub=2., gamma_02_lb=-1., gamma_02_ub=1.,
-   gamma_y1_lb=-1., gamma_y1_ub=1., gamma_y2_lb=-1., gamma_y2_ub=1.,
-   gamma_a1_lb=-1., gamma_a1_ub=1., gamma_a2_lb=-1., gamma_a2_ub=1.,
-   gamma_b1_lb=-1., gamma_b1_ub=1., gamma_b2_lb=-1., gamma_b2_ub=1.,
+   gamma_01_lb=-.1, gamma_01_ub=.1, gamma_02_lb=-.1, gamma_02_ub=.1,
+   gamma_y1_lb=-.1, gamma_y1_ub=.1, gamma_y2_lb=-.1, gamma_y2_ub=.1,
+   gamma_a1_lb=-.1, gamma_a1_ub=.1, gamma_a2_lb=-.1, gamma_a2_ub=.1,
+   gamma_b1_lb=-.1, gamma_b1_ub=.1, gamma_b2_lb=-.1, gamma_b2_ub=.1,
    eps_b_var_lb=0.0001, eps_b_var_ub=1., iota0_lb=-2., iota0_ub=2., iota1_lb=0.0001, iota1_ub=2., iota2_lb=0.0001, iota2_ub=1., iota3_lb=-2., iota3_ub=2.,
    N=1000, restrict_flag=1, seed=1234, error_log_flag=0, print_flag=false,
    par_flag=0, par_N=4, pref_only_flag=0, type_N=2, bellman_trace=false, bellman_iter=5000, bellman_tol=1e-9,
@@ -299,7 +299,7 @@ function smm_sobol(data_formatted, paramsprefs::ParametersPrefs, paramsdec::Para
          eps_b_var_ub, iota0_ub, iota1_ub, iota2_ub, iota3_ub])
    elseif pref_only_flag == 1
       s = SobolSeq(param_N, [sigma_B_lb, sigma_alphaT1_lb, rho_lb, gamma_01_lb, gamma_02_lb, gamma_y1_lb, gamma_y2_lb,
-         gamma_a1_lb, gamma_a2_lb, gamma_b1_lb, gamma_b2_lb, eps_b_var_lb, iota0_lb, iota1_lb, iota2_lb, iota3_lb],
+         gamma_a1_lb, gamma_a2_lb, gamma_b1_lb, gamma_b2_lb],
          [sigma_B_ub, sigma_alphaT1_ub, rho_ub, gamma_01_ub, gamma_02_ub, gamma_y1_ub, gamma_y2_ub,
          gamma_a1_ub, gamma_a2_ub, gamma_b1_ub, gamma_b2_ub])
    else
@@ -427,10 +427,10 @@ function smm_sobol_write_results(path_min, path_store, data_formatted, paramspre
    sobol_N=10,
    sigma_B_lb=0.001, sigma_B_ub=2., sigma_alphaT1_lb=0.001, sigma_alphaT1_ub=5.,
    rho_lb=-0.99, rho_ub=0.99,
-   gamma_01_lb=-1., gamma_01_ub=2., gamma_02_lb=-1., gamma_02_ub=1.,
-   gamma_y1_lb=-1., gamma_y1_ub=1., gamma_y2_lb=-1., gamma_y2_ub=1.,
-   gamma_a1_lb=-1., gamma_a1_ub=1., gamma_a2_lb=-1., gamma_a2_ub=1.,
-   gamma_b1_lb=-1., gamma_b1_ub=1., gamma_b2_lb=-1., gamma_b2_ub=1.,
+   gamma_01_lb=-.1, gamma_01_ub=.1, gamma_02_lb=-.1, gamma_02_ub=.1,
+   gamma_y1_lb=-.1, gamma_y1_ub=.1, gamma_y2_lb=-.1, gamma_y2_ub=.1,
+   gamma_a1_lb=-.1, gamma_a1_ub=.1, gamma_a2_lb=-.1, gamma_a2_ub=.1,
+   gamma_b1_lb=-.1, gamma_b1_ub=.1, gamma_b2_lb=-.1, gamma_b2_ub=.1,
    eps_b_var_lb=0.0001, eps_b_var_ub=1., iota0_lb=-2., iota0_ub=2., iota1_lb=0.0001, iota1_ub=2., iota2_lb=0.0001, iota2_ub=1., iota3_lb=-2., iota3_ub=2.,
    N=1000, restrict_flag=1, seed=1234, error_log_flag=0, print_flag=false,
    par_flag=0, par_N=4, type_N=2, pref_only_flag=0, bellman_trace=false, bellman_iter=5000, bellman_tol=1e-9,
@@ -453,7 +453,7 @@ function smm_sobol_write_results(path_min, path_store, data_formatted, paramspre
       eps_b_var_ub=eps_b_var_ub, iota0_ub=iota0_ub, iota1_ub=iota1_ub, iota2_ub=iota2_ub, iota3_ub=iota3_ub,
       N=N, restrict_flag=restrict_flag, seed=seed,
       error_log_flag=error_log_flag, print_flag=print_flag, par_flag=par_flag, par_N=par_N, type_N=type_N, pref_only_flag=pref_only_flag,
-      bellman_trace=bellman_trace, bellman_iter=bellman_iter, bellman_tol=bellman_tol, B_lim=B_lim, alphaT1_lim_lb=alphaT1_lim_lb, alphaT1_lim_ub)
+      bellman_trace=bellman_trace, bellman_iter=bellman_iter, bellman_tol=bellman_tol, B_lim=B_lim, alphaT1_lim_lb=alphaT1_lim_lb, alphaT1_lim_ub=alphaT1_lim_ub)
 
    # write minimizer to text file
    writedlm(path_min, transpose([estimation_time; estimation_result[1]; estimation_result[2]]), ", ")
@@ -912,7 +912,14 @@ end
 
 function plot_moment_quantiles_all_params(moment_index::Int64, data_moments, path_storage; bin_N=5)
 
-   for i in 1:20
+   # import stored sobol sequence of parameters and moments
+   sobol_storage = readcsv(path_storage)
+
+   # extract number of parameters
+   N_parameters = length(sobol_storage[1,:])-39
+   N_moments = 39
+
+   for i in 1:N_parameters
       compute_quantile_output = param_constant_quantile(i, path_storage)
 
       plot_moment_quantiles(moment_index, i, compute_quantile_output[2], compute_quantile_output[3], compute_quantile_output[4], compute_quantile_output[5], data_moments)
@@ -927,11 +934,12 @@ function param_constant_quantile(param_index::Int, path_storage; bin_N=5)
    # import stored sobol sequence of parameters and moments
    sobol_storage = readcsv(path_storage)
 
-   # extract number of moments
-   N_moments = length(sobol_storage[1,21:length(sobol_storage[1,:])])
+   # extract number of parameters
+   N_parameters = length(sobol_storage[1,:])-39
+   N_moments = 39
 
    # subset stored sequence to parameter vectors that did not violate constraints
-   sobol_storage_valid = sobol_storage[find(x->x!=Inf, sobol_storage[:,21]),:]
+   sobol_storage_valid = sobol_storage[find(x->x!=Inf, sobol_storage[:,N_parameters+1]),:]
 
    # compute bins for paramter to hold "fixed"
    param_quantiles = quantile(sobol_storage_valid[:,param_index], (linspace(1,bin_N,bin_N)-ones(bin_N))/(bin_N-1))
@@ -943,19 +951,28 @@ function param_constant_quantile(param_index::Int, path_storage; bin_N=5)
    moment_storage_50 = zeros(bin_N,N_moments)
    moment_storage_75 = zeros(bin_N,N_moments)
 
-   for n in 1:bin_N
-      # find indices of fixed parameter in proper bin
-      if n == 1
-         bin_indices = find(x->x<=param_quantiles[n], sobol_storage_valid[:,param_index])
-      else
-         bin_indices = intersect(find(x->x>param_quantiles[n-1], sobol_storage_valid[:,param_index]),
-            find(x->x<=param_quantiles[n], sobol_storage_valid[:,param_index]))
-      end
+   for moment_index in 1:N_moments
 
-      for moment_index in 1:N_moments
-         moment_storage_25[n,moment_index] = quantile(sobol_storage_valid[bin_indices, 20+moment_index], 0.25)
-         moment_storage_50[n,moment_index] = quantile(sobol_storage_valid[bin_indices, 20+moment_index], 0.5)
-         moment_storage_75[n,moment_index] = quantile(sobol_storage_valid[bin_indices, 20+moment_index], 0.75)
+      # subset to parameter vectors with non-missing moments
+      sobol_storage_valid_mom = sobol_storage_valid[find(x->isnan(x)==false,sobol_storage_valid[:,N_parameters+moment_index]),:]
+
+      if isempty(sobol_storage_valid_mom) == false
+
+         for n in 1:bin_N
+            # find indices of fixed parameter in proper bin
+            if n == 1
+               bin_indices = find(x->x<=param_quantiles[n], sobol_storage_valid_mom[:,param_index])
+            else
+               bin_indices = intersect(find(x->x>param_quantiles[n-1], sobol_storage_valid_mom[:,param_index]),
+                  find(x->x<=param_quantiles[n], sobol_storage_valid_mom[:,param_index]))
+            end
+
+            moment_storage_25[n,moment_index] = quantile(sobol_storage_valid_mom[bin_indices, N_parameters+moment_index], 0.25)
+            moment_storage_50[n,moment_index] = quantile(sobol_storage_valid_mom[bin_indices, N_parameters+moment_index], 0.5)
+            moment_storage_75[n,moment_index] = quantile(sobol_storage_valid_mom[bin_indices, N_parameters+moment_index], 0.75)
+
+         end
+
       end
 
    end
