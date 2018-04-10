@@ -13,7 +13,7 @@ println("solution utilities loading")
 mutable struct ParametersDec
   beta :: Float64 ## discount rate
   r :: Float64 ## interest rate
-  B :: Float64 ## temporary continuation value shifter
+  B :: Float64 ## temporary continuation value shifter (set to 1)
 
   alphaT1 :: Float64 ## T-period utility parameter (RF choice)
   alphaT2 :: Float64 ## T-period utility parameter (RF choice)
@@ -290,7 +290,7 @@ end
 
 # tuition as function of parameters
 
-function t_opt_vary_parma(param_vary::String, y_annual, a, b, paramsdec::ParametersDec, param_min, param_max; param_N=10)
+function t_opt_vary_param(param_vary::String, y_annual, a, b, paramsdec::ParametersDec, param_min, param_max; param_N=10)
 
   # store results
   t_opt_vec = zeros(param_N)

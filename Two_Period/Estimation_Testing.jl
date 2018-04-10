@@ -22,31 +22,17 @@ paramsshock = ParametersShock()
 
 #= Test DGP and Tinker with Parameters =#
 
-test_params = [1., 1., -0.5,
-.1, -1.,
-3.1, -7.5,
-.1, -5.1,
-.15, -2.1,
+test_params = [1., 1., 0.0,
+.1, .1,
+.1, .1,
+.1, .1,
+.1, .1,
 0.4,
 2.6, 0.25, 0.062, 0.]
 
-sobol_result_pref_only = [1.053558349609375, 1.910491943359375, -0.9333819580078125, 0.030084228515625006,
-0.032171630859374994, 0.07411499023437501, 0.06156616210937502, 0.068914794921875, -0.076385498046875,
-0.073419189453125, -0.080853271484375,
-0.022, 2.97, 0.27, 0.02, 0.]
+test_params = deepcopy(test_params)
 
-sobol_25k = [1.303497314453125, 1.089263916015625, -0.857647705078125, -0.030355834960937494,
-0.00042114257812500555, -0.0788238525390625, 0.0004943847656249944, 0.13460388183593752, 0.085638427734375,
-0.06196594238281253, -0.031182861328125006,
-0.04096771240234375, -7.0474853515625, 0.6693145751953125, 1.73492462158203127, -0.224908447265625]
-
-sobol_100k = [1.0044631958007812, 2.1470413208007812, -0.7989120483398438, 0.11725234985351565, 0.0015121459960937556,
-0.0876487731933594, -0.0054916381835937444, 0.0008796691894531333, -0.014323425292968747, 0.04067306518554689, 19836425781252776e-21,
-0.2679761505126953, -3.0971221923828125, 0.3985466003417969, 0.9536629486083984, -0.12674713134765625]
-
-test_params = deepcopy(sobol_100k)
-
-paramsprefs = ParametersPrefs(sigma_B=test_params[1], sigma_alphaT1=test_params[2], rho=test_params[3])
+paramsprefs = ParametersPrefs(sigma_alphaT1=test_params[1], sigma_alphaT2=test_params[2], rho=test_params[3])
 
 paramsprefs.gamma_0 = [test_params[4], test_params[5]]
 paramsprefs.gamma_y = [test_params[6], test_params[7]]
@@ -87,27 +73,17 @@ test_B = 1.
 test_alphaT1 = 6.4
 test_alphaT2 = 80.
 
-paramsdec_test = ParametersDec(B=test_B, alphaT1=test_alphaT1, iota2=0.11)
-paramsdec_test.alphaT2 = test_alphaT2
+paramsdec_test = ParametersDec(alphaT1=test_alphaT1, alphaT2=test_alphaT2, B=test_B, iota2=0.11)
 
 bellman_optim_child!(y_test, a_test, b_test, paramsdec_test, paramsshock)
-
-# vary params
-
-choices_vary_param("alphaT1", y_test, a_test, b_test, paramsdec_test, paramsshock, 0.5, 7., param_N=50)
 
 aprime_actual = nlsy79data_formatted[2][2][n]
 s_actual = nlsy79data_formatted[4][1][n]
 x_actual = nlsy79data_formatted[5][1][n]
 
-# mean next-period income
-y_annual_test = Y_evol(y_test, paramsdec.rho_y, 0.)
+# vary params
 
-# mean next-period HC
-bprime_test = HC_prod(b_test, x_actual, 0.,
-  paramsdec.iota0, paramsdec.iota1, paramsdec.iota2, paramsdec.iota3)
-
-t_opt_vary_parma("alphaT1", y_annual_test, aprime_actual, bprime_test, paramsdec_test, 0.001, 0.1, param_N=20)
+choices_vary_param("alphaT1", y_test, a_test, b_test, paramsdec_test, paramsshock, 0.5, 7., param_N=50)
 
 #= Testing Moment Generation =#
 
@@ -118,7 +94,7 @@ t_opt_vary_parma("alphaT1", y_annual_test, aprime_actual, bprime_test, paramsdec
 #= Testing Sobol SMM/Write =#
 
 @elapsed smm_sobol_write_results("sobol_test.txt", "sobol_store.csv", nlsy79data_formatted, paramsprefs, paramsdec, paramsshock,
-  sobol_N=100, par_flag=1, par_N=4, print_flag=0)
+  sobol_N=10, par_flag=0, par_N=4, print_flag=0)
 
 #= Testing SMM Objective Function or Particular Parameter Vector =#
 
@@ -153,7 +129,7 @@ param_trouble = [0.297727, 3.86741, 0.139219, -0.460938, 0.171875, 0.984375, -0.
 # run and store sobol sequence tests
 
 @elapsed smm_sobol_write_results("sobol_test.txt", "sobol_store.csv", nlsy79data_formatted, paramsprefs, paramsdec, paramsshock,
-  sobol_N=100, par_flag=1, par_N=4, print_flag=0)
+  sobol_N=10, par_flag=1, par_N=4, print_flag=0)
 
 # compute data moments
 

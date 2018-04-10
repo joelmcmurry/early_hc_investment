@@ -9,8 +9,8 @@ include("Utilities_Solution_2P.jl")
 #= Structures =#
 
 mutable struct ParametersPrefs
-  sigma_B :: Float64 ## common stddev of B
   sigma_alphaT1 :: Float64 ## common stddev of alphaT1
+  sigma_alphaT2 :: Float64 ## common stddev of alphaT2
   rho :: Float64 ##  common correlation
   Sigma :: Array{Float64} ## var-covar matrix
 
@@ -19,12 +19,12 @@ mutable struct ParametersPrefs
   gamma_a :: Array{Float64} ## asset coefficient of mean function
   gamma_b :: Array{Float64} ## hc coefficient of mean function
 
-  function ParametersPrefs(;sigma_B=0.5, sigma_alphaT1=5., rho=0.,
-    gamma_0=[0., 0.], gamma_y=[0.1, 0.001], gamma_a=[0.1, 0.001], gamma_b=[0.1, 0.001])
+  function ParametersPrefs(;sigma_alphaT1=1., sigma_alphaT2=1., rho=0.,
+    gamma_0=[0., 10.], gamma_y=[0.01, 0.1], gamma_a=[0.01, 0.1], gamma_b=[0.01, 0.1])
 
-    Sigma = [sigma_B^2 rho*sigma_B*sigma_alphaT1; rho*sigma_alphaT1*sigma_B sigma_alphaT1^2]
+    Sigma = [sigma_alphaT1^2 rho*sigma_alphaT1*sigma_alphaT2; rho*sigma_alphaT1*sigma_alphaT2 sigma_alphaT2^2]
 
-    new(sigma_B, sigma_alphaT1, rho, Sigma, gamma_0, gamma_y, gamma_a, gamma_b)
+    new(sigma_alphaT1, sigma_alphaT2, rho, Sigma, gamma_0, gamma_y, gamma_a, gamma_b)
 
   end
 
@@ -47,16 +47,16 @@ end
 
 # create variance-covariance matrix of preferences
 
-function pref_Sigma(sigma_B::Float64, sigma_alphaT1::Float64, rho::Float64)
+function pref_Sigma(sigma_alphaT1::Float64, sigma_alphaT2::Float64, rho::Float64)
 
-  Sigma = Symmetric([sigma_B^2 rho*sigma_B*sigma_alphaT1; rho*sigma_alphaT1*sigma_B sigma_alphaT1^2])
+  Sigma = Symmetric([sigma_alphaT1^2 rho*sigma_alphaT2*sigma_alphaT1; rho*sigma_alphaT1*sigma_alphaT2 sigma_alphaT2^2])
 
 end
 
 # draw state-specific types
 
 function type_construct(y::Float64, a::Float64, b::Float64, paramsprefs::ParametersPrefs; seed=1234, type_N=2,
-  B_lim=1000., alphaT1_lim_lb=0.001, alphaT1_lim_ub=0.999, mean_flag=0)
+  alphaT1_lim_lb=0.00001, alphaT1_lim_ub=100000., alphaT2_lim_lb=0.00001, alphaT2_lim_ub=100000., mean_flag=0)
 
   # for computational reasons, set factor by which we divide states
   y_div = 100000.
@@ -76,19 +76,21 @@ function type_construct(y::Float64, a::Float64, b::Float64, paramsprefs::Paramet
   # compute density of each draw
   type_pdf = pdf(MvNormal(mu_state, paramsprefs.Sigma), type_vec)
 
-  # bound B above 0
+  # bound alphaT1 above 0
   type_vec[1,:] = exp.(type_vec[1,:])
 
-  # bound alpha between 0 and 1
-  type_vec[2,:] = 1./(1+exp.(-1.*type_vec[2,:]))
+  # bound alphaT2 above 0
+  type_vec[2,:] = exp.(type_vec[2,:])
 
   # transform to probabilities
   type_prob = type_pdf./sum(type_pdf)
 
   # trim outliers
-  type_vec[1,:] = min.(type_vec[1,:], B_lim)
-  type_vec[2,:] = max.(type_vec[2,:], alphaT1_lim_lb)
-  type_vec[2,:] = min.(type_vec[2,:], alphaT1_lim_ub)
+  type_vec[1,:] = max.(type_vec[1,:], alphaT1_lim_lb)
+  type_vec[2,:] = max.(type_vec[2,:], alphaT2_lim_lb)
+
+  type_vec[1,:] = min.(type_vec[1,:], alphaT1_lim_ub)
+  type_vec[2,:] = min.(type_vec[2,:], alphaT2_lim_ub)
 
   return type_vec, type_prob
 
@@ -272,7 +274,7 @@ function sim_choices(initial_states::Array{Float64}, sample_prefs::Array{Float64
 
   # for each unique initial condition and type, compute choices and assign choices to sample
   for n in 1:N_unique_states
-
+    
     # extract drawn types given initial conditions
     y_match = find(x->x==initial_states_unique[n,1], initial_states_types_unique[:,1])
     a_match = find(x->x==initial_states_unique[n,2], initial_states_types_unique[:,2])
@@ -299,9 +301,8 @@ function sim_choices(initial_states::Array{Float64}, sample_prefs::Array{Float64
       # end
 
       # update preferences given type
-      paramsdec.B = drawn_prefs[1]
-      paramsdec.alphaT1 = drawn_prefs[2]
-      paramsdec.alphaT2 = 1. - drawn_prefs[2]
+      paramsdec.alphaT1 = drawn_prefs[1]
+      paramsdec.alphaT2 = drawn_prefs[2]
 
       # println(initial_states_unique[n,1:3], drawn_prefs)
 

@@ -187,10 +187,10 @@ end
 # jointly estimate parameters via SMM
 
 function smm(data_formatted, paramsprefs::ParametersPrefs, paramsdec::ParametersDec, paramsshock::ParametersShock;
-  sigma_B_start=1., sigma_alphaT1_start=0.1, rho_start=0.,
-  gamma_01_start=1., gamma_02_start=0.1, gamma_y1_start=0.1, gamma_y2_start=0.1,
-  gamma_a1_start=0.1, gamma_a2_start=0.1, gamma_b1_start=0.1, gamma_b2_start=0.1,
-  eps_b_var_start=0.022, iota0_start=1.87, iota1_start=0.42, iota2_start=0.06, iota3_start=0.0,
+  sigma_alphaT1_start=0.1, sigma_alphaT2_start=0.1, rho_start=0.,
+  gamma_01_start=0., gamma_02_start=10., gamma_y1_start=0.01, gamma_y2_start=0.1,
+  gamma_a1_start=0.01, gamma_a2_start=0.1, gamma_b1_start=0.01, gamma_b2_start=0.1,
+  eps_b_var_start=0.022, iota0_start=2., iota1_start=0.25, iota2_start=0.1, iota3_start=0.0,
   N=1000,
   opt_code="neldermead", restrict_flag=1, seed=1234, error_log_flag=0,
   opt_trace=false, opt_iter=1000, print_flag=false, opt_tol=1e-9, par_flag=0, par_N=4,
@@ -221,12 +221,12 @@ function smm(data_formatted, paramsprefs::ParametersPrefs, paramsdec::Parameters
     bellman_trace=bellman_trace, bellman_iter=bellman_iter, bellman_tol=bellman_tol)
 
    if pref_only_flag == 0
-      start_vec = [sigma_B_start, sigma_alphaT1_start, rho_start,
+      start_vec = [sigma_alphaT1_start, sigma_alphaT2_start, rho_start,
          gamma_01_start, gamma_02_start, gamma_y1_start, gamma_y2_start,
          gamma_a1_start, gamma_a2_start, gamma_b1_start, gamma_b2_start,
          eps_b_var_start, iota0_start, iota1_start, iota2_start, iota3_start]
    elseif pref_only_flag == 1
-      start_vec = [sigma_B_start, sigma_alphaT1_start, rho_start,
+      start_vec = [sigma_alphaT1_start, sigma_alphaT2_start, rho_start,
          gamma_01_start, gamma_02_start, gamma_y1_start, gamma_y2_start,
          gamma_a1_start, gamma_a2_start, gamma_b1_start, gamma_b2_start]
    else
@@ -252,16 +252,16 @@ end
 
 function smm_sobol(data_formatted, paramsprefs::ParametersPrefs, paramsdec::ParametersDec, paramsshock::ParametersShock;
    sobol_N=10,
-   sigma_B_lb=0.001, sigma_B_ub=2., sigma_alphaT1_lb=0.001, sigma_alphaT1_ub=5.,
+   sigma_alphaT1_lb=0.001, sigma_alphaT1_ub=5., sigma_alphaT2_lb=0.001, sigma_alphaT2_ub=5.,
    rho_lb=-0.99, rho_ub=0.99,
-   gamma_01_lb=-.1, gamma_01_ub=.1, gamma_02_lb=-.1, gamma_02_ub=.1,
-   gamma_y1_lb=-.1, gamma_y1_ub=.1, gamma_y2_lb=-.1, gamma_y2_ub=.1,
-   gamma_a1_lb=-.1, gamma_a1_ub=.1, gamma_a2_lb=-.1, gamma_a2_ub=.1,
-   gamma_b1_lb=-.1, gamma_b1_ub=.1, gamma_b2_lb=-.1, gamma_b2_ub=.1,
+   gamma_01_lb=-.1, gamma_01_ub=.1, gamma_02_lb=-1., gamma_02_ub=.20,
+   gamma_y1_lb=-.1, gamma_y1_ub=.1, gamma_y2_lb=-10., gamma_y2_ub=10.,
+   gamma_a1_lb=-.1, gamma_a1_ub=.1, gamma_a2_lb=-.10, gamma_a2_ub=10.,
+   gamma_b1_lb=-.1, gamma_b1_ub=.1, gamma_b2_lb=-.10, gamma_b2_ub=10.,
    eps_b_var_lb=0.0001, eps_b_var_ub=1., iota0_lb=-2., iota0_ub=2., iota1_lb=0.0001, iota1_ub=2., iota2_lb=0.0001, iota2_ub=1., iota3_lb=-2., iota3_ub=2.,
    N=1000, restrict_flag=1, seed=1234, error_log_flag=0, print_flag=false,
    par_flag=0, par_N=4, pref_only_flag=0, type_N=2, bellman_trace=false, bellman_iter=5000, bellman_tol=1e-9,
-   B_lim=1000., alphaT1_lim_lb=0.001, alphaT1_lim_ub=0.999)
+   alphaT1_lim_lb=0.00001, alphaT1_lim_ub=100000., alphaT2_lim_lb=0.00001, alphaT2_lim_ub=100000.)
 
    # store number of parameters
    if pref_only_flag == 0
@@ -292,15 +292,15 @@ function smm_sobol(data_formatted, paramsprefs::ParametersPrefs, paramsdec::Para
 
    # construct Sobol sequence
    if pref_only_flag == 0
-      s = SobolSeq(param_N, [sigma_B_lb, sigma_alphaT1_lb, rho_lb, gamma_01_lb, gamma_02_lb, gamma_y1_lb, gamma_y2_lb,
+      s = SobolSeq(param_N, [sigma_alphaT1_lb, sigma_alphaT2_lb, rho_lb, gamma_01_lb, gamma_02_lb, gamma_y1_lb, gamma_y2_lb,
          gamma_a1_lb, gamma_a2_lb, gamma_b1_lb, gamma_b2_lb, eps_b_var_lb, iota0_lb, iota1_lb, iota2_lb, iota3_lb],
-         [sigma_B_ub, sigma_alphaT1_ub, rho_ub, gamma_01_ub, gamma_02_ub, gamma_y1_ub, gamma_y2_ub,
+         [sigma_alphaT1_ub, sigma_alphaT2_ub, rho_ub, gamma_01_ub, gamma_02_ub, gamma_y1_ub, gamma_y2_ub,
          gamma_a1_ub, gamma_a2_ub, gamma_b1_ub, gamma_b2_ub,
          eps_b_var_ub, iota0_ub, iota1_ub, iota2_ub, iota3_ub])
    elseif pref_only_flag == 1
-      s = SobolSeq(param_N, [sigma_B_lb, sigma_alphaT1_lb, rho_lb, gamma_01_lb, gamma_02_lb, gamma_y1_lb, gamma_y2_lb,
+      s = SobolSeq(param_N, [sigma_alphaT1_lb, sigma_alphaT2_lb, rho_lb, gamma_01_lb, gamma_02_lb, gamma_y1_lb, gamma_y2_lb,
          gamma_a1_lb, gamma_a2_lb, gamma_b1_lb, gamma_b2_lb],
-         [sigma_B_ub, sigma_alphaT1_ub, rho_ub, gamma_01_ub, gamma_02_ub, gamma_y1_ub, gamma_y2_ub,
+         [sigma_alphaT1_ub, sigma_alphaT2_ub, rho_ub, gamma_01_ub, gamma_02_ub, gamma_y1_ub, gamma_y2_ub,
          gamma_a1_ub, gamma_a2_ub, gamma_b1_ub, gamma_b2_ub])
    else
       throw(error("pref_only_flag must be 0 or 1"))
@@ -329,7 +329,8 @@ function smm_sobol(data_formatted, paramsprefs::ParametersPrefs, paramsdec::Para
       median_expected_prefs = sobol_draw_check(data_formatted, [param_sobol[4], param_sobol[5]], [param_sobol[6], param_sobol[7]],
          [param_sobol[8], param_sobol[9]], [param_sobol[10], param_sobol[11]])
 
-      if median_expected_prefs[1] > B_lim || median_expected_prefs[2] < alphaT1_lim_lb || median_expected_prefs[2] > alphaT1_lim_ub
+      if median_expected_prefs[1] < alphaT1_lim_lb || median_expected_prefs[2] < alphaT2_lim_lb ||
+         median_expected_prefs[1] > alphaT1_lim_ub || median_expected_prefs[2] > alphaT2_lim_ub
          pref_error_flag = 1
       else
          pref_error_flag = 0
@@ -385,7 +386,7 @@ function sobol_draw_check(data_formatted, gamma_0::Array{Float64}, gamma_y::Arra
    mu_state = gamma_0 + gamma_y*y_med/y_div + gamma_a*a_med/a_div + gamma_b*b_med/b_div
 
    # transform
-   mean_prefs = [exp(mu_state[1]), 1/(1+exp(-mu_state[2]))]
+   mean_prefs = [exp(mu_state[1]), exp(mu_state[2])]
 
    return mean_prefs
 
@@ -396,10 +397,10 @@ end
 # runs function and writes output to text file in specified path
 
 function smm_write_results(path, data_formatted, paramsprefs::ParametersPrefs, paramsdec::ParametersDec, paramsshock::ParametersShock;
-   sigma_B_start=1., sigma_alphaT1_start=0.1, rho_start=0.,
-   gamma_01_start=1., gamma_02_start=0.1, gamma_y1_start=0.1, gamma_y2_start=0.1,
-   gamma_a1_start=0.1, gamma_a2_start=0.1, gamma_b1_start=0.1, gamma_b2_start=0.1,
-   eps_b_var_start=0.022, iota0_start=1.87, iota1_start=0.42, iota2_start=0.06, iota3_start=0.0,
+   sigma_alphaT1_start=0.1, sigma_alphaT2_start=0.1, rho_start=0.,
+   gamma_01_start=0., gamma_02_start=10., gamma_y1_start=0.01, gamma_y2_start=0.1,
+   gamma_a1_start=0.01, gamma_a2_start=0.1, gamma_b1_start=0.01, gamma_b2_start=0.1,
+   eps_b_var_start=0.022, iota0_start=2., iota1_start=0.25, iota2_start=0.1, iota3_start=0.0,
    N=1000,
    opt_code="neldermead", restrict_flag=1, seed=1234, error_log_flag=0,
    opt_trace=false, opt_iter=1000, opt_tol=1e-9, print_flag=false, par_flag=0, par_N=4, type_N=2, pref_only_flag=0,
@@ -407,7 +408,7 @@ function smm_write_results(path, data_formatted, paramsprefs::ParametersPrefs, p
 
    # run SMM
    estimation_time = @elapsed estimation_result = smm(data_formatted, paramsprefs, paramsdec, paramsshock,
-      sigma_B_start=sigma_B_start, sigma_alphaT1_start=sigma_alphaT1_start, rho_start=rho_start,
+      sigma_alphaT1_start=sigma_alphaT1_start, sigma_alphaT2_start=sigma_alphaT2_start, rho_start=rho_start,
       gamma_01_start=gamma_01_start, gamma_02_start=gamma_02_start,
       gamma_y1_start=gamma_y1_start, gamma_y2_start=gamma_y2_start,
       gamma_a1_start=gamma_a1_start, gamma_a2_start=gamma_a2_start,
@@ -425,27 +426,27 @@ end
 
 function smm_sobol_write_results(path_min, path_store, data_formatted, paramsprefs::ParametersPrefs, paramsdec::ParametersDec, paramsshock::ParametersShock;
    sobol_N=10,
-   sigma_B_lb=0.001, sigma_B_ub=2., sigma_alphaT1_lb=0.001, sigma_alphaT1_ub=5.,
+   sigma_alphaT1_lb=0.001, sigma_alphaT1_ub=5., sigma_alphaT2_lb=0.001, sigma_alphaT2_ub=5.,
    rho_lb=-0.99, rho_ub=0.99,
-   gamma_01_lb=-.1, gamma_01_ub=.1, gamma_02_lb=-.1, gamma_02_ub=.1,
-   gamma_y1_lb=-.1, gamma_y1_ub=.1, gamma_y2_lb=-.1, gamma_y2_ub=.1,
-   gamma_a1_lb=-.1, gamma_a1_ub=.1, gamma_a2_lb=-.1, gamma_a2_ub=.1,
-   gamma_b1_lb=-.1, gamma_b1_ub=.1, gamma_b2_lb=-.1, gamma_b2_ub=.1,
+   gamma_01_lb=-.1, gamma_01_ub=.1, gamma_02_lb=-1., gamma_02_ub=.20,
+   gamma_y1_lb=-.1, gamma_y1_ub=.1, gamma_y2_lb=-10., gamma_y2_ub=10.,
+   gamma_a1_lb=-.1, gamma_a1_ub=.1, gamma_a2_lb=-.10, gamma_a2_ub=10.,
+   gamma_b1_lb=-.1, gamma_b1_ub=.1, gamma_b2_lb=-.10, gamma_b2_ub=10.,
    eps_b_var_lb=0.0001, eps_b_var_ub=1., iota0_lb=-2., iota0_ub=2., iota1_lb=0.0001, iota1_ub=2., iota2_lb=0.0001, iota2_ub=1., iota3_lb=-2., iota3_ub=2.,
    N=1000, restrict_flag=1, seed=1234, error_log_flag=0, print_flag=false,
    par_flag=0, par_N=4, type_N=2, pref_only_flag=0, bellman_trace=false, bellman_iter=5000, bellman_tol=1e-9,
-   B_lim=1000., alphaT1_lim_lb=0.001, alphaT1_lim_ub=0.999)
+   alphaT1_lim_lb=0.00001, alphaT1_lim_ub=100000., alphaT2_lim_lb=0.00001, alphaT2_lim_ub=100000.)
 
   # run SMM
   estimation_time = @elapsed estimation_result = smm_sobol(data_formatted, paramsprefs, paramsdec, paramsshock,
       sobol_N=sobol_N,
-      sigma_B_lb=sigma_B_lb, sigma_alphaT1_lb=sigma_alphaT1_lb, rho_lb=rho_lb,
+      sigma_alphaT1_lb=sigma_alphaT1_lb, sigma_alphaT2_lb=sigma_alphaT2_lb, rho_lb=rho_lb,
       gamma_01_lb=gamma_01_lb, gamma_02_lb=gamma_02_lb,
       gamma_y1_lb=gamma_y1_lb, gamma_y2_lb=gamma_y2_lb,
       gamma_a1_lb=gamma_a1_lb, gamma_a2_lb=gamma_a2_lb,
       gamma_b1_lb=gamma_b1_lb, gamma_b2_lb=gamma_b2_lb,
       eps_b_var_lb=eps_b_var_lb, iota0_lb=iota0_lb, iota1_lb=iota1_lb, iota2_lb=iota2_lb, iota3_lb=iota3_lb,
-      sigma_B_ub=sigma_B_ub, sigma_alphaT1_ub=sigma_alphaT1_ub, rho_ub=rho_ub,
+      sigma_alphaT1_ub=sigma_alphaT1_ub, sigma_alphaT2_ub=sigma_alphaT2_ub, rho_ub=rho_ub,
       gamma_01_ub=gamma_01_ub, gamma_02_ub=gamma_02_ub,
       gamma_y1_ub=gamma_y1_ub, gamma_y2_ub=gamma_y2_ub,
       gamma_a1_ub=gamma_a1_ub, gamma_a2_ub=gamma_a2_ub,
@@ -453,7 +454,8 @@ function smm_sobol_write_results(path_min, path_store, data_formatted, paramspre
       eps_b_var_ub=eps_b_var_ub, iota0_ub=iota0_ub, iota1_ub=iota1_ub, iota2_ub=iota2_ub, iota3_ub=iota3_ub,
       N=N, restrict_flag=restrict_flag, seed=seed,
       error_log_flag=error_log_flag, print_flag=print_flag, par_flag=par_flag, par_N=par_N, type_N=type_N, pref_only_flag=pref_only_flag,
-      bellman_trace=bellman_trace, bellman_iter=bellman_iter, bellman_tol=bellman_tol, B_lim=B_lim, alphaT1_lim_lb=alphaT1_lim_lb, alphaT1_lim_ub=alphaT1_lim_ub)
+      bellman_trace=bellman_trace, bellman_iter=bellman_iter, bellman_tol=bellman_tol,
+      alphaT1_lim_lb=alphaT1_lim_lb, alphaT1_lim_ub=alphaT1_lim_ub, alphaT2_lim_lb=alphaT2_lim_lb, alphaT2_lim_ub=alphaT2_lim_ub)
 
    # write minimizer to text file
    writedlm(path_min, transpose([estimation_time; estimation_result[1]; estimation_result[2]]), ", ")
@@ -478,7 +480,7 @@ function smm_obj_moments(initial_state_data, target_moments, W::Array, param_vec
 
   # set parameters according to guess (and generate var-covar matrix)
   if pref_only_flag == 0
-     paramsprefs.sigma_B, paramsprefs.sigma_alphaT1, paramsprefs.rho,
+     paramsprefs.sigma_alphaT1, paramsprefs.sigma_alphaT2, paramsprefs.rho,
      paramsprefs.gamma_0[1], paramsprefs.gamma_0[2],
      paramsprefs.gamma_y[1], paramsprefs.gamma_y[2],
      paramsprefs.gamma_a[1], paramsprefs.gamma_a[2],
@@ -487,7 +489,7 @@ function smm_obj_moments(initial_state_data, target_moments, W::Array, param_vec
 
      paramsprefs.Sigma = Symmetric(pref_Sigma(param_vec[1], param_vec[2], param_vec[3]))
   elseif pref_only_flag == 1
-     paramsprefs.sigma_B, paramsprefs.sigma_alphaT1, paramsprefs.rho,
+     paramsprefs.sigma_alphaT1, paramsprefs.sigma_alphaT2, paramsprefs.rho,
      paramsprefs.gamma_0[1], paramsprefs.gamma_0[2],
      paramsprefs.gamma_y[1], paramsprefs.gamma_y[2],
      paramsprefs.gamma_a[1], paramsprefs.gamma_a[2],
@@ -784,13 +786,13 @@ function vary_param(param_name::String, initial_state_data, param_vec::Array,
 
   # set parameters according to guess
   if pref_only_flag == 0
-     paramsprefs_float.sigma_B, paramsprefs_float.sigma_alphaT1, paramsprefs_float.rho,
+     paramsprefs_float.sigma_alphaT1, paramsprefs_float.sigma_alphaT2, paramsprefs_float.rho,
      paramsprefs_float.gamma_0[1], paramsprefs_float.gamma_0[2],
      paramsprefs_float.gamma_a[1], paramsprefs_float.gamma_a[2],
      paramsprefs_float.gamma_b[1], paramsprefs_float.gamma_b[2],
      paramsshock_float.eps_b_var, paramsdec_float.iota0, paramsdec_float.iota1, paramsdec_float.iota2, paramsdec_float.iota3 = param_vec
   elseif pref_only_flag == 1
-     paramsprefs_float.sigma_B, paramsprefs_float.sigma_alphaT1, paramsprefs_float.rho,
+     paramsprefs_float.sigma_alphaT1, paramsprefs_float.sigma_alphaT2, paramsprefs_float.rho,
      paramsprefs_float.gamma_0[1], paramsprefs_float.gamma_0[2],
      paramsprefs_float.gamma_a[1], paramsprefs_float.gamma_a[2],
      paramsprefs_float.gamma_b[1], paramsprefs_float.gamma_b[2] = param_vec
@@ -799,10 +801,10 @@ function vary_param(param_name::String, initial_state_data, param_vec::Array,
   # for each parameter guess, solve model and calculate full set of moments and store
   for n in 1:param_N
    println(string("Iter ",n," of ",param_N,": ",param_grid[n]))
-   if param_name == "sigma_B"
-      paramsprefs_float.sigma_B = param_grid[n]
-   elseif param_name == "sigma_alphaT1"
+   if param_name == "sigma_alphaT1"
       paramsprefs_float.sigma_alphaT1 = param_grid[n]
+   elseif param_name == "sigma_alphaT2"
+      paramsprefs_float.sigma_alphaT2 = param_grid[n]
    elseif param_name == "rho"
       paramsprefs_float.rho = param_grid[n]
    elseif param_name == "eps_b_var"
