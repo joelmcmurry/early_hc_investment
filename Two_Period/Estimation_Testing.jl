@@ -30,7 +30,7 @@ test_params = [1., 1., 0.0,
 0.4,
 2.6, 0.25, 0.062, 0.]
 
-test_params = deepcopy(test_params)
+test_params = deepcopy(sobol_100k)
 
 paramsprefs = ParametersPrefs(sigma_alphaT1=test_params[1], sigma_alphaT2=test_params[2], rho=test_params[3])
 
@@ -63,15 +63,15 @@ test_mom4 = [data_mom[1][28:39] test_mom[2][28:39] test_mom[1][28:39]]
 
 ## Individual State/Pref Testing
 
-n=200
+n=500
 
 y_test = nlsy79data_formatted[1][1][n]
 a_test = nlsy79data_formatted[2][1][n]
 b_test = nlsy79data_formatted[3][1][n]
 
 test_B = 1.
-test_alphaT1 = 6.4
-test_alphaT2 = 80.
+test_alphaT1 = 1.
+test_alphaT2 = 100000.
 
 paramsdec_test = ParametersDec(alphaT1=test_alphaT1, alphaT2=test_alphaT2, B=test_B, iota2=0.11)
 
@@ -93,19 +93,20 @@ choices_vary_param("alphaT1", y_test, a_test, b_test, paramsdec_test, paramsshoc
 
 #= Testing Sobol SMM/Write =#
 
-@elapsed smm_sobol_write_results("sobol_test.txt", "sobol_store.csv", nlsy79data_formatted, paramsprefs, paramsdec, paramsshock,
+@elapsed smm_sobol_write_results("sobol_test.txt", "sobol_store.csv", "sobol_store_error.csv", nlsy79data_formatted, paramsprefs, paramsdec, paramsshock,
   sobol_N=10, par_flag=0, par_N=4, print_flag=0)
 
 #= Testing SMM Objective Function or Particular Parameter Vector =#
 
 # SMM optimizer
 
-sobol_1000 = [4.110590515136719, 1.374931701660156, 0.21378295898437494, 0.0032104492187499944, -0.8801025390625,
-0.014929199218749994, -9.913330078125, 0.060510253906250006, 8.484136962890625, 0.05633544921875, 0.161993408203125,
-0.7751079406738282, -1.702392578125, 0.14816388549804688, 0.2985930969238281, -0.041748046875]
+sobol_100k = [2.8229872169494628, 4.489028148651123, -0.8287337493896484, 0.09395217895507812,
+-0.12639923095703132, 0.06224136352539064, -7.6587677001953125, -0.061412811279296875,
+4.178622055053711, -0.06649246215820312, 0.1873065948486328, 0.811538470840454, 1.0388336181640625,
+1.4026711643218994, 0.4082890048980713, -0.1326141357421875]
 
-@elapsed smm_obj_par = smm_obj_testing(nlsy79data_formatted, sobol_1000, paramsprefs, paramsdec, paramsshock,
-  par_flag=1, par_N=4, type_N=6, N=500, pref_only_flag=0, error_log_flag=1)
+@elapsed smm_obj_par = smm_obj_testing(nlsy79data_formatted, sobol_100k, paramsprefs, paramsdec, paramsshock,
+  par_flag=1, par_N=4, type_N=20, N=5000, pref_only_flag=0, error_log_flag=1)
 
 # read moments more easily
 

@@ -272,6 +272,7 @@ function smm_sobol(data_formatted, paramsprefs::ParametersPrefs, paramsdec::Para
 
    # initialize storage of parameter vectors and moments
    sobol_storage = Any[]
+   sobol_storage_error = Any[]
 
    # generate data moments
    data_moments = moment_gen_dist(data_formatted, restrict_flag=restrict_flag)
@@ -318,10 +319,12 @@ function smm_sobol(data_formatted, paramsprefs::ParametersPrefs, paramsdec::Para
 
       # initialize row of Sobol storage
       sobol_storage_i = zeros(param_N+39)
+      sobol_storage_error_i = zeros(param_N+39)
 
       param_sobol = next(s)
 
       sobol_storage_i[1:param_N] = param_sobol
+      sobol_storage_error_i[1:param_N] = param_sobol
 
       println(string("Iter ",i," of ",sobol_N,": ",param_sobol))
 
@@ -340,7 +343,10 @@ function smm_sobol(data_formatted, paramsprefs::ParametersPrefs, paramsdec::Para
          obj_val = Inf
          println("skipped")
 
-         sobol_storage_i[param_N+1:param_N+39] = fill(Inf,39)
+         sobol_storage_error_i[param_N+1:param_N+39] = fill(Inf,39)
+
+         # append moments and parameter vector to storage
+         push!(sobol_storage_error, sobol_storage_error_i)
 
       else
          obj_val, sim_moments, sim_data, error_log = smm_obj_moments(data_formatted, data_moments, W, param_sobol, paramsprefs_float, paramsdec_float, paramsshock_float,
@@ -350,6 +356,9 @@ function smm_sobol(data_formatted, paramsprefs::ParametersPrefs, paramsdec::Para
 
          sobol_storage_i[param_N+1:param_N+39] = sim_moments[1]
 
+         # append moments and parameter vector to storage
+         push!(sobol_storage, sobol_storage_i)
+
       end
 
       if obj_val < min_obj_val
@@ -357,14 +366,11 @@ function smm_sobol(data_formatted, paramsprefs::ParametersPrefs, paramsdec::Para
          min_obj_params = param_sobol
       end
 
-      # append moments and parameter vector to storage
-      push!(sobol_storage, sobol_storage_i)
-
       # println(string("Min Value: ",min_obj_val," Minimizer: ",min_obj_params))
 
    end
 
-  return min_obj_val, min_obj_params, sobol_storage
+  return min_obj_val, min_obj_params, sobol_storage, sobol_storage_error
 
 end
 
@@ -424,7 +430,7 @@ function smm_write_results(path, data_formatted, paramsprefs::ParametersPrefs, p
 
 end
 
-function smm_sobol_write_results(path_min, path_store, data_formatted, paramsprefs::ParametersPrefs, paramsdec::ParametersDec, paramsshock::ParametersShock;
+function smm_sobol_write_results(path_min, path_store, path_store_error, data_formatted, paramsprefs::ParametersPrefs, paramsdec::ParametersDec, paramsshock::ParametersShock;
    sobol_N=10,
    sigma_alphaT1_lb=0.001, sigma_alphaT1_ub=5., sigma_alphaT2_lb=0.001, sigma_alphaT2_ub=5.,
    rho_lb=-0.99, rho_ub=0.99,
@@ -462,6 +468,7 @@ function smm_sobol_write_results(path_min, path_store, data_formatted, paramspre
 
    # write full list of moments and parameters in sequence to text file
    writecsv(path_store, estimation_result[3])
+   writecsv(path_store_error, estimation_result[4])
 
 end
 

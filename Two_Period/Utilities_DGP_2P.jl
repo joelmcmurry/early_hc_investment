@@ -20,7 +20,7 @@ mutable struct ParametersPrefs
   gamma_b :: Array{Float64} ## hc coefficient of mean function
 
   function ParametersPrefs(;sigma_alphaT1=1., sigma_alphaT2=1., rho=0.,
-    gamma_0=[0., 10.], gamma_y=[0.01, 0.1], gamma_a=[0.01, 0.1], gamma_b=[0.01, 0.1])
+    gamma_0=[0., 1.], gamma_y=[0.01, 0.1], gamma_a=[0.01, 0.1], gamma_b=[0.01, 0.1])
 
     Sigma = [sigma_alphaT1^2 rho*sigma_alphaT1*sigma_alphaT2; rho*sigma_alphaT1*sigma_alphaT2 sigma_alphaT2^2]
 
@@ -274,7 +274,7 @@ function sim_choices(initial_states::Array{Float64}, sample_prefs::Array{Float64
 
   # for each unique initial condition and type, compute choices and assign choices to sample
   for n in 1:N_unique_states
-    
+
     # extract drawn types given initial conditions
     y_match = find(x->x==initial_states_unique[n,1], initial_states_types_unique[:,1])
     a_match = find(x->x==initial_states_unique[n,2], initial_states_types_unique[:,2])
@@ -294,7 +294,7 @@ function sim_choices(initial_states::Array{Float64}, sample_prefs::Array{Float64
       # start optimization with solution for previous type
       # if type_index != 1
       #  aprime_start = choices0_type[1]
-    #    x_start = choices0_type[2]
+      #  x_start = choices0_type[2]
       # else
         aprime_start = 1.
         x_start = 1.
