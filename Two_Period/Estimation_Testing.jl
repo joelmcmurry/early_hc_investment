@@ -22,15 +22,15 @@ paramsshock = ParametersShock()
 
 #= Test DGP and Tinker with Parameters =#
 
-test_params = [1., 1., 0.0,
-.1, .1,
-.1, .1,
-.1, .1,
-.1, .1,
+test_params = [0.1, 0.5, 0.0,
+-10., .7,
+.0, 1.,
+.0, .5,
+.0, .17,
 0.4,
 2.6, 0.25, 0.062, 0.]
 
-test_params = deepcopy(sobol_100k)
+test_params = deepcopy(test_params)
 
 paramsprefs = ParametersPrefs(sigma_alphaT1=test_params[1], sigma_alphaT2=test_params[2], rho=test_params[3])
 
@@ -44,7 +44,7 @@ paramsdec.iota1 = test_params[14]
 paramsdec.iota2 = test_params[15]
 paramsdec.iota3 = test_params[16]
 
-test_paths = sim_paths(initial_state_data, paramsshock, paramsprefs, seed=1234, N=500, type_N=6)
+test_paths = sim_paths(initial_state_data, paramsshock, paramsprefs, seed=1234, N=5000, type_N=10)
 
 @elapsed test_choices = sim_choices(test_paths[1], test_paths[2], test_paths[3], test_paths[4],
   paramsprefs, paramsdec, paramsshock, bellman_tol=1e-9, bellman_iter=5000, error_log_flag=1)
@@ -105,7 +105,7 @@ sobol_100k = [2.8229872169494628, 4.489028148651123, -0.8287337493896484, 0.0939
 4.178622055053711, -0.06649246215820312, 0.1873065948486328, 0.811538470840454, 1.0388336181640625,
 1.4026711643218994, 0.4082890048980713, -0.1326141357421875]
 
-@elapsed smm_obj_par = smm_obj_testing(nlsy79data_formatted, sobol_100k, paramsprefs, paramsdec, paramsshock,
+@elapsed smm_obj_par = smm_obj_testing(nlsy79data_formatted, sobol_10k_moretype, paramsprefs, paramsdec, paramsshock,
   par_flag=1, par_N=4, type_N=20, N=5000, pref_only_flag=0, error_log_flag=1)
 
 # read moments more easily
