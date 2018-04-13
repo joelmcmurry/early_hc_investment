@@ -56,7 +56,7 @@ end
 # draw state-specific types
 
 function type_construct(y::Float64, a::Float64, b::Float64, paramsprefs::ParametersPrefs; seed=1234, type_N=2,
-  alphaT1_lim_lb=0.00001, alphaT1_lim_ub=100000., alphaT2_lim_lb=0.00001, alphaT2_lim_ub=100000., mean_flag=0)
+  alphaT1_lim_lb=0.00001, alphaT1_lim_ub=100000., alphaT2_lim_lb=0.00001, alphaT2_lim_ub=1000000., mean_flag=0)
 
   # for computational reasons, set factor by which we divide states
   y_div = 100000.
@@ -508,19 +508,18 @@ function moment_gen_dist(formatted_data; restrict_flag=1)
     "E[x|1st quant. b]","E[x|2nd quant. b]","E[x|3rd quant. b]","E[x|4th quant. b]"]
 
   # moment restriction
-  # moment_restrict = [2, 3, 4, 5, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25,
-  #   26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41]
+  moment_omit = [3, 7]
 
   # restrict moments to "relevant" moments if prompted
-  # if restrict_flag == 1
-  #   moments_out = moments_out[moment_restrict]
-  #   moments_desc = moments_desc[moment_restrict]
-  # elseif restrict_flag == 0
-  #   moments_out = moments_out
-  #   moments_desc = moments_desc
-  # else
-  #   throw(error("restrict_flag must be 0 or 1"))
-  # end
+  if restrict_flag == 1
+    moments_out = setdiff(moments_out, moments_out[moment_omit])
+    moments_desc = setdiff(moments_desc, moments_desc[moment_omit])
+  elseif restrict_flag == 0
+    moments_out = moments_out
+    moments_desc = moments_desc
+  else
+    throw(error("restrict_flag must be 0 or 1"))
+  end
 
   return moments_out, moments_desc
 

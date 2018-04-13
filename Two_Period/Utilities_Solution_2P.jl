@@ -15,6 +15,7 @@ mutable struct ParametersDec
   r :: Float64 ## interest rate
   B :: Float64 ## temporary continuation value shifter (set to 1)
 
+  alpha01 :: Float64 ## first period utility parameter
   alphaT1 :: Float64 ## T-period utility parameter (RF choice)
   alphaT2 :: Float64 ## T-period utility parameter (RF choice)
 
@@ -30,12 +31,12 @@ mutable struct ParametersDec
   rho_y :: Float64 ## income persistence parameter
 
   function ParametersDec(;beta=0.5, r=0.18, B=1.,
-    alphaT1=0.5, alphaT2=1-alphaT1,
+    alpha01=100., alphaT1=0.5, alphaT2=10.,
     iota0=2.6, iota1=0.25,
     iota2=0.062, iota3=0.,
     beta0=4.134, beta1=0.03, beta2=0.003, rho_y=1.002)
 
-    new(beta, r, B, alphaT1, alphaT2, iota0, iota1, iota2, iota3, beta0, beta1, beta2, rho_y)
+    new(beta, r, B, alpha01, alphaT1, alphaT2, iota0, iota1, iota2, iota3, beta0, beta1, beta2, rho_y)
 
   end
 
@@ -188,7 +189,8 @@ end
 # RF college quality optimal choice
 
 function t_opt(y_annual::Float64, a::Float64, b::Float64,
-  alphaT1::Float64, alphaT2::Float64, beta0::Float64, beta1::Float64, beta2::Float64, r::Float64)
+  alphaT1::Float64, alphaT2::Float64, beta0::Float64, beta1::Float64, beta2::Float64, r::Float64;
+  t_max=60000.)
 
   # annualize r
   r_annual = r/6.
@@ -196,8 +198,8 @@ function t_opt(y_annual::Float64, a::Float64, b::Float64,
   pv_scale = dot(ones(4),(1/(1+r_annual)).^[1.0 2.0 3.0 4.0])
   y_pv = dot(y_annual*ones(4),(1/(1+r_annual)).^[1.0 2.0 3.0 4.0])
 
-  t_star = alphaT2*(beta1+beta2*log(b))*(y_pv + a)/
-        (pv_scale*(alphaT1 + alphaT2*(beta1+beta2*log(b))))
+  t_star = min(alphaT2*(beta1+beta2*log(b))*(y_pv + a)/
+        (pv_scale*(alphaT1 + alphaT2*(beta1+beta2*log(b)))), t_max)
 
   return t_star
 
@@ -248,7 +250,7 @@ function bellman_optim_child!(y::Float64, a::Float64, b::Float64,
        Vprime_array_exact[j] = EV_T(y_b_array[j,1], choices[1], y_b_array[j,2], paramsdec)
      end
 
-     value_out = 6.*log(c/6.) + paramsdec.beta*paramsdec.B*dot(Vprime_array_exact,paramsshock.eps_joint_dist_discrete)
+     value_out = paramsdec.alpha01*8.*log(c/8.) + paramsdec.beta*paramsdec.B*dot(Vprime_array_exact,paramsshock.eps_joint_dist_discrete)
 
    else
 
@@ -288,40 +290,6 @@ end
 
 #= Solution Testing Functions =#
 
-# tuition as function of parameters
-
-function t_opt_vary_param(param_vary::String, y_annual, a, b, paramsdec::ParametersDec, param_min, param_max; param_N=10)
-
-  # store results
-  t_opt_vec = zeros(param_N)
-
-  # make parameter grid
-  param_grid = linspace(param_min, param_max, param_N)
-
-  for n in 1:param_N
-    if param_vary == "alphaT1"
-      paramsdec.alphaT1 = param_grid[n]
-      # paramsdec.alphaT2 = 1- paramsdec.alphaT1
-    elseif param_vary == "alphaT2"
-      paramsdec.alphaT2 = param_grid[n]
-      # paramsdec.alphaT1 = 1 - paramsdec.alphaT2
-    elseif param_vary == "B"
-      paramsdec.B = param_grid[n]
-    end
-
-    t_opt_vec[n] = t_opt(y_annual, a, b, paramsdec.alphaT1, paramsdec.alphaT2,
-    paramsdec.beta0, paramsdec.beta1, paramsdec.beta2, paramsdec.r)
-  end
-
-  t_plot = figure()
-  plot(param_grid, t_opt_vec)
-  xlabel(param_vary)
-  ylabel("tuition")
-  ax = PyPlot.gca()
-  ax[:legend](loc="lower right")
-
-end
-
 # choices as functions of parameters
 
 function choices_vary_param(param_vary::String, y, a, b, paramsdec::ParametersDec, paramsshock::ParametersShock, param_min, param_max; param_N=10)
@@ -348,13 +316,21 @@ function choices_vary_param(param_vary::String, y, a, b, paramsdec::ParametersDe
     aprime_vec[n], x_vec[n] = bellman_optim_child!(y, a, b, paramsdec, paramsshock,
       aprime_start=1., x_start=1., opt_code="neldermead", error_log_flag=0, opt_trace=false, opt_iter=5000, opt_tol=1e-9)[2]
 
-    # compute mean next period income and HC and calculate mean tuition paid
-    yprime_mean = Y_evol(y, paramsdec.rho_y, 0.)
-    bprime_mean = HC_prod(b, x_vec[n], 0., paramsdec.iota0, paramsdec.iota1, paramsdec.iota2, paramsdec.iota3)
+    # compute expected tuition paid given epsilon shocks
+    y_b_array = zeros(paramsshock.eps_joint_discrete_N,2)
+    tuition_array = zeros(paramsshock.eps_joint_discrete_N)
+
+    for j in 1:paramsshock.eps_joint_discrete_N
+      y_b_array[j,1] = Y_evol(y, paramsdec.rho_y, paramsshock.eps_joint_discrete_range[j,1])
+      y_b_array[j,2] = HC_prod(b, x_vec[n], paramsshock.eps_joint_discrete_range[j,2],
+        paramsdec.iota0, paramsdec.iota1, paramsdec.iota2, paramsdec.iota3)
+
+      tuition_array[j] = t_opt(y_b_array[j,1], aprime_vec[n], y_b_array[j,2], paramsdec.alphaT1, paramsdec.alphaT2,
+        paramsdec.beta0, paramsdec.beta1, paramsdec.beta2, paramsdec.r)
+    end
 
     # compute mean tuition
-    t_mean_vec[n] = t_opt(yprime_mean, aprime_vec[n], bprime_mean, paramsdec.alphaT1, paramsdec.alphaT2,
-      paramsdec.beta0, paramsdec.beta1, paramsdec.beta2, paramsdec.r)
+    t_mean_vec[n] = dot(tuition_array,paramsshock.eps_joint_dist_discrete)
 
   end
 

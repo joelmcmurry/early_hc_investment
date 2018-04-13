@@ -16,17 +16,17 @@ nlsy79data_formatted = data_transform(nlsy79data)
 
 initial_state_data = nlsy79data_formatted
 
-paramsdec = ParametersDec()
+paramsdec = ParametersDec(alpha01=100.)
 paramsprefs = ParametersPrefs()
 paramsshock = ParametersShock()
 
 #= Test DGP and Tinker with Parameters =#
 
-test_params = [0.1, 0.5, 0.0,
--10., .7,
-.0, 1.,
-.0, .5,
-.0, .17,
+test_params = [5., 5., 0.75,
+-5., 0.,
+0.1, 2.,
+-0.1, 1.2,
+0.1, 0.1,
 0.4,
 2.6, 0.25, 0.062, 0.]
 
@@ -53,37 +53,59 @@ test_mom = moment_gen_dist(test_choices)
 
 data_mom = moment_gen_dist(nlsy79data_formatted)
 
-test_mom1 = [data_mom[1][1:9] test_mom[2][1:9] test_mom[1][1:9]]
+test_mom1 = [data_mom[1][1:7] test_mom[2][1:7] test_mom[1][1:7]]
 
-test_mom2 = [data_mom[1][10:15] test_mom[2][10:15] test_mom[1][10:15]]
+test_mom2 = [data_mom[1][8:13] test_mom[2][8:13] test_mom[1][8:13]]
 
-test_mom3 = [data_mom[1][16:27] test_mom[2][16:27] test_mom[1][16:27]]
+test_mom3 = [data_mom[1][14:25] test_mom[2][14:25] test_mom[1][14:25]]
 
-test_mom4 = [data_mom[1][28:39] test_mom[2][28:39] test_mom[1][28:39]]
+test_mom4 = [data_mom[1][26:37] test_mom[2][26:37] test_mom[1][26:37]]
 
 ## Individual State/Pref Testing
 
-n=500
+n=1
 
-y_test = nlsy79data_formatted[1][1][n]
-a_test = nlsy79data_formatted[2][1][n]
-b_test = nlsy79data_formatted[3][1][n]
+# y_test = nlsy79data_formatted[1][1][n]
+# a_test = nlsy79data_formatted[2][1][n]
+# b_test = nlsy79data_formatted[3][1][n]
 
-test_B = 1.
-test_alphaT1 = 1.
-test_alphaT2 = 100000.
+y_test = test_choices[1][1][n]
+a_test = test_choices[2][1][n]
+b_test = test_choices[3][1][n]
 
-paramsdec_test = ParametersDec(alphaT1=test_alphaT1, alphaT2=test_alphaT2, B=test_B, iota2=0.11)
+println(y_test, " ", a_test, " ", b_test)
 
-bellman_optim_child!(y_test, a_test, b_test, paramsdec_test, paramsshock)
+mean_prefs = type_construct(y_test, a_test, b_test, paramsprefs, mean_flag=1, type_N=10)
 
-aprime_actual = nlsy79data_formatted[2][2][n]
-s_actual = nlsy79data_formatted[4][1][n]
-x_actual = nlsy79data_formatted[5][1][n]
+test_alphaT1 = mean_prefs[1][1]
+test_alphaT2 = mean_prefs[1][2]
+
+test_alphaT1 = test_paths[2][n,1]
+test_alphaT2 = test_paths[2][n,2]
+
+# test_alphaT1 = 0.000000001
+# test_alphaT2 = test_paths[2][n,2]
+
+paramsdec.alphaT1 = test_alphaT1
+paramsdec.alphaT2 = test_alphaT2
+
+choices = bellman_optim_child!(y_test, a_test, b_test, paramsdec, paramsshock)
+
+test_choices[2][2][n]
+test_choices[5][1][n]
+
+# aprime_actual = nlsy79data_formatted[2][2][n]
+# s_actual = nlsy79data_formatted[4][1][n]
+# x_actual = nlsy79data_formatted[5][1][n]
+
+bT_noshock = HC_prod(b_test, choices[2][2], 0., paramsdec.iota0, paramsdec.iota1, paramsdec.iota2, paramsdec.iota3)
+
+t_opt(Y_evol(y_test, paramsdec.rho_y, 0.), choices[2][1], bT_noshock,
+  paramsdec.alphaT1, paramsdec.alphaT2, paramsdec.beta0, paramsdec.beta1, paramsdec.beta2, paramsdec.r)
 
 # vary params
 
-choices_vary_param("alphaT1", y_test, a_test, b_test, paramsdec_test, paramsshock, 0.5, 7., param_N=50)
+choices_vary_param("alphaT1", y_test, a_test, b_test, paramsdec, paramsshock, 1., 100., param_N=50)
 
 #= Testing Moment Generation =#
 
