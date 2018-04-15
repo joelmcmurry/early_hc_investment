@@ -19,8 +19,8 @@ mutable struct ParametersPrefs
   gamma_a :: Array{Float64} ## asset coefficient of mean function
   gamma_b :: Array{Float64} ## hc coefficient of mean function
 
-  function ParametersPrefs(;sigma_alphaT1=1., sigma_alphaT2=1., rho=0.,
-    gamma_0=[0., 1.], gamma_y=[0.01, 0.1], gamma_a=[0.01, 0.1], gamma_b=[0.01, 0.1])
+  function ParametersPrefs(;sigma_alphaT1=5., sigma_alphaT2=5., rho=0.75,
+    gamma_0=[-10., 0.], gamma_y=[10., 5.], gamma_a=[-0.1, 5.], gamma_b=[5., 2.])
 
     Sigma = [sigma_alphaT1^2 rho*sigma_alphaT1*sigma_alphaT2; rho*sigma_alphaT1*sigma_alphaT2 sigma_alphaT2^2]
 
@@ -56,12 +56,12 @@ end
 # draw state-specific types
 
 function type_construct(y::Float64, a::Float64, b::Float64, paramsprefs::ParametersPrefs; seed=1234, type_N=2,
-  alphaT1_lim_lb=0.00001, alphaT1_lim_ub=100000., alphaT2_lim_lb=0.00001, alphaT2_lim_ub=1000000., mean_flag=0)
+  alphaT1_lim_lb=0.00001, alphaT1_lim_ub=1000000., alphaT2_lim_lb=0.00001, alphaT2_lim_ub=1000000., mean_flag=0)
 
   # for computational reasons, set factor by which we divide states
-  y_div = 100000.
-  a_div = 10000.
-  b_div= 1.
+  y_div = 1000000.
+  a_div = 100000.
+  b_div= 10.
 
   # compute mean of joint distribution given type
   mu_state = paramsprefs.gamma_0 + paramsprefs.gamma_y*y/y_div + paramsprefs.gamma_a*a/a_div + paramsprefs.gamma_b*b/b_div

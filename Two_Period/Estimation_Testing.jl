@@ -22,13 +22,13 @@ paramsshock = ParametersShock()
 
 #= Test DGP and Tinker with Parameters =#
 
-test_params = [5., 5., 0.75,
--5., 0.,
-0.1, 2.,
--0.1, 1.2,
-0.1, 0.1,
+test_params = [1., 10., 0.75,
+-15., -5.,
+10., 10.,
+-30., 10.,
+10., 5.,
 0.4,
-2.6, 0.25, 0.062, 0.]
+2.6, 0.2, 0.01, 0.01]
 
 test_params = deepcopy(test_params)
 
@@ -39,12 +39,17 @@ paramsprefs.gamma_y = [test_params[6], test_params[7]]
 paramsprefs.gamma_a = [test_params[8], test_params[9]]
 paramsprefs.gamma_b = [test_params[10], test_params[11]]
 paramsshock.eps_b_var = test_params[12]
+
 paramsdec.iota0 = test_params[13]
 paramsdec.iota1 = test_params[14]
 paramsdec.iota2 = test_params[15]
 paramsdec.iota3 = test_params[16]
 
-test_paths = sim_paths(initial_state_data, paramsshock, paramsprefs, seed=1234, N=5000, type_N=10)
+test_paths = sim_paths(initial_state_data, paramsshock, paramsprefs, seed=1234, N=5000, type_N=20)
+
+plot_density(test_paths[2][:,1], "alphaT1", minimum(test_paths[2][:,1]), maximum(test_paths[2][:,1]))
+
+plot_density(test_paths[2][:,2], "alphaT2", minimum(test_paths[2][:,2]), maximum(test_paths[2][:,2]))
 
 @elapsed test_choices = sim_choices(test_paths[1], test_paths[2], test_paths[3], test_paths[4],
   paramsprefs, paramsdec, paramsshock, bellman_tol=1e-9, bellman_iter=5000, error_log_flag=1)
