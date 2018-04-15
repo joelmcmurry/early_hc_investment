@@ -16,7 +16,7 @@ nlsy79data_formatted = data_transform(nlsy79data)
 
 initial_state_data = nlsy79data_formatted
 
-paramsdec = ParametersDec(alpha01=100.)
+paramsdec = ParametersDec()
 paramsprefs = ParametersPrefs()
 paramsshock = ParametersShock()
 
@@ -187,3 +187,11 @@ plot_moments(B_hi_test[1], B_hi_test[2], B_hi_test[3], moment_display_flag=1)
 @elapsed type_test = vary_param("gamma_y2", nlsy79data_formatted, smm_1e1_min_mod, paramsprefs, paramsshock, paramsdec, 0., 3., 10, par_flag=1, par_N=4)
 
 plot_moments(type_test[1], type_test[2], type_test[3], moment_display_flag=2)
+
+#= Testing DGP with Serial and Parallel =#
+
+mom_ser = dgp_moments(nlsy79data_formatted, paramsprefs, paramsdec, paramsshock,
+  seed=1234, N=100, restrict_flag=1, error_log_flag=1, type_N=2, bellman_trace=false, bellman_iter=5000, bellman_tol=1e-9)
+
+mom_par = dgp_moments_par(nlsy79data_formatted, paramsprefs, paramsdec, paramsshock,
+  seed=1234, N=100, restrict_flag=1, par_N=2, error_log_flag=1, type_N=2, bellman_trace=false, bellman_iter=5000, bellman_tol=1e-9)

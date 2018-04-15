@@ -2,7 +2,7 @@
 
 using DataFrames
 using Sobol
-# using LatexPrint
+using LatexPrint
 using PyPlot
 
 println("estimation utilities loading")
@@ -102,6 +102,9 @@ function dgp_moments(initial_state_data, paramsprefs::ParametersPrefs, paramsdec
   # calculate simulated data moments
   sim_moments = moment_gen_dist(sim_data, restrict_flag=restrict_flag)
 
+  # if print_flag == 1
+
+
   return sim_moments, sim_data[1:6], sim_data[7]
 
 end
@@ -161,7 +164,7 @@ function dgp_moments_par(initial_state_data, paramsprefs::ParametersPrefs, param
       sample_prefs = vcat(sample_prefs, sim_choices_par[par_segment][6])
    end
 
-   sim_data = [states_y, states_a, states_b, choices_savings, choices_x, sample_prefs]
+   sim_data = states_y, states_a, states_b, choices_savings, choices_x, sample_prefs
 
    # calculate simulated data moments
    sim_moments = moment_gen_dist(sim_data, restrict_flag=restrict_flag)
@@ -170,13 +173,112 @@ function dgp_moments_par(initial_state_data, paramsprefs::ParametersPrefs, param
    error_log = Any[]
    if error_log_flag == 1
       for par_index in 1:par_N
-         if isempty(sim_choices_par[par_index][6]) == false
-            push!(error_log, sim_choices_par[par_index][6])
+         if isempty(sim_choices_par[par_index][7]) == false
+            push!(error_log, sim_choices_par[par_index][7])
          end
       end
    end
 
-  return sim_moments, sim_data, error_log
+  return sim_moments, sim_data[1:6], error_log
+
+end
+
+# print parameters and moments
+
+function print_param_mom(data_formatted, paramsprefs::ParametersPrefs, paramsdec::ParametersDec, paramsshock::ParametersShock;
+  seed=1234, N=1000, restrict_flag=1, error_log_flag=0, type_N=2, bellman_trace=false, bellman_iter=5000, bellman_tol=1e-9,
+  print_flag=0, par_flag=0, par_N=4)
+
+   # generate data moments
+   data_moments = moment_gen_dist(data_formatted)
+
+   # generate simulated moments
+   if par_flag == 0
+      sim_moments = dgp_moments(data_formatted, paramsprefs, paramsdec, paramsshock,
+         seed=seed, N=N, restrict_flag=restrict_flag, error_log_flag=error_log_flag, type_N=type_N,
+         bellman_trace=bellman_trace, bellman_iter=bellman_iter, bellman_tol=bellman_tol)
+   elseif par_flag == 1
+      sim_moments = dgp_moments_par(data_formatted, paramsprefs, paramsdec, paramsshock,
+        seed=seed, N=N, restrict_flag=restrict_flag, par_N=par_N, error_log_flag=error_log_flag, type_N=type_N,
+        bellman_trace=bellman_trace, bellman_iter=bellman_iter, bellman_tol=bellman_tol)
+   else
+      throw(error("par_flag must be 0 or 1"))
+   end
+
+   # print preference parameter table
+
+   collabels = ["Parameter", "Meaning", "Estimate"]
+
+   table_prefs  = Array(Any,(12,3))
+   table_prefs[1,1:3] = collabels
+   table_prefs[2:12,1] = ["\$\\sigma_\{\\alpha_1\}^2\$", "\$\\sigma_\{\\alpha_2\}^2\$", "\$\\rho\$",
+   "\$\\gamma_0^\{\\alpha_1\}\$", "\$\\gamma_y^\{\\alpha_1\}\$","\$\\gamma_a^\{\\alpha_1\}\$", "\$\\gamma_b^\{\\alpha_1\}\$",
+   "\$\\gamma_0^\{\\alpha_2\}\$", "\$\\gamma_y^\{\\alpha_2\}\$","\$\\gamma_a^\{\\alpha_2\}\$", "\$\\gamma_b^\{\\alpha_2\}\$"]
+   table_prefs[2:12,2] = ["Var. \$\\alpha_1\$", "Var. \$\\alpha_2\$", "Corr. Coeff.",
+   "\$\\alpha_1\$ Mean Param.", "\$\\alpha_1\$ Mean Param.","\$\\alpha_1\$ Mean Param.", "\$\\alpha_1\$ Mean Param.",
+   "\$\\alpha_2\$ Mean Param.", "\$\\alpha_2\$ Mean Param.","\$\\alpha_2\$ Mean Param.", "\$\\alpha_2\$ Mean Param.",]
+   table_prefs[2:12,3] = [round(paramsprefs.sigma_alphaT1,2), round(paramsprefs.sigma_alphaT2,2), round(paramsprefs.rho,2),
+   round(paramsprefs.gamma_0[1],2), round(paramsprefs.gamma_y[1],2), round(paramsprefs.gamma_a[1],2), round(paramsprefs.gamma_b[1],2),
+   round(paramsprefs.gamma_0[2],2), round(paramsprefs.gamma_y[2],2), round(paramsprefs.gamma_a[2],2), round(paramsprefs.gamma_b[2],2)]
+
+   table_prefs_out = tabular(table_prefs)
+
+   # print other parameter table
+
+   table_other  = Array(Any,(6,3))
+   table_other[1,1:3] = collabels
+   table_other[2:6,1] = ["\$\\sigma_\{b\}^2\$", "\$\\iota_0\$", "\$\\iota_1\$", "\$\\iota_2\$", "\$\\iota_3\$"]
+   table_other[2:6,2] = ["Var. HC Shock", "HC Prod. Param.", "HC Prod. Param.", "HC Prod. Param.", "HC Prod. Param."]
+   table_other[2:6,3] = [round(paramsshock.eps_b_var,2), round(paramsdec.iota0,2), round(paramsdec.iota1,2),
+   round(paramsdec.iota2,2), round(paramsdec.iota3,2)]
+
+   table_other_out = tabular(table_other)
+
+   # print table of first, second, and correlation moments
+
+   collabels_mom = ["Moment", "Data", "Model"]
+
+   table_mom = Array(Any,(14,3))
+   table_mom[1,1:3] = collabels_mom
+   table_mom[2:14,1] = sim_moments[1][2][1:13]
+   table_mom[2:14,2] = round.(data_moments[1][1:13],2)
+   table_mom[2:14,3] = round.(sim_moments[1][1][1:13],2)
+
+   table_mom_out = tabular(table_mom)
+
+   # graph conditional averages
+   plot_cond_mom(data_moments, sim_moments, 14, "Income Quartile", "Avg. a2 Cond. on Income", "Terminal Assets", "Income", "a2_cond_y_fig",
+      print_flag)
+   plot_cond_mom(data_moments, sim_moments, 18, "Initial Asset Quartile", "Avg. a2 Cond. on Income", "Terminal Assets", "Initial Asset", "a2_cond_a_fig",
+      print_flag)
+   plot_cond_mom(data_moments, sim_moments, 22, "Initial HC Quartile", "Avg. a2 Cond. on Income", "Terminal Assets", "Initial HC", "a2_cond_b_fig",
+      print_flag)
+
+   plot_cond_mom(data_moments, sim_moments, 26, "Income Quartile", "Avg. x Cond. on Income", "Investment", "Income", "x_cond_y_fig",
+      print_flag)
+   plot_cond_mom(data_moments, sim_moments, 30, "Initial Asset Quartile", "Avg. x Cond. on Income", "Investment", "Initial Asset", "x_cond_a_fig",
+      print_flag)
+   plot_cond_mom(data_moments, sim_moments, 34, "Initial HC Quartile", "Avg. x Cond. on Income", "Investment", "Initial HC", "x_cond_b_fig",
+      print_flag)
+
+end
+
+# plot conditional moments by state quantile
+
+function plot_cond_mom(data_moments, sim_moments, mom_range_start, xname, yname, title_mom, title_cond, filename, print_flag)
+
+   fig = figure()
+   plot(linspace(1,4,4), data_moments[1][mom_range_start:mom_range_start+3], label="Data")
+   plot(linspace(1,4,4), sim_moments[1][1][mom_range_start:mom_range_start+3], label="Model")
+   xticks([1,2,3,4])
+   xlabel(xname)
+   ylabel(yname)
+   ax = PyPlot.gca()
+   ax[:legend](loc="lower right")
+   title(string("Average ",title_mom," Conditional on ",title_cond," Quantile"))
+   if print_flag == 1
+     savefig(string("C:/Users/j0el/Documents/Wisconsin/Projects/Early_HC_Investment/Pictures/",filename,".eps"))
+   end
 
 end
 

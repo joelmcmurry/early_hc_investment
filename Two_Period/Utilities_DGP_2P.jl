@@ -108,7 +108,9 @@ function type_construct(y::Float64, a::Float64, b::Float64, paramsprefs::Paramet
   lin_comb = paramsprefs.gamma_0 + paramsprefs.gamma_y*y/y_div + paramsprefs.gamma_a*a/a_div + paramsprefs.gamma_b*b/b_div
 
   # generalize logistic transform to bound between K and A
-  mu_state = A + (1./(1.+exp.(-lin_comb)))*(K-A)
+  mu_state = zeros(2)
+  mu_state[1] = A + (1./(1.+exp(-lin_comb[1])))*(K-A)
+  mu_state[2] = A + (1./(1.+exp(-lin_comb[2])))*(K-A)
 
   # draw N types or return mean draws only
   if mean_flag == 0
