@@ -22,13 +22,13 @@ paramsshock = ParametersShock()
 
 #= Test DGP and Tinker with Parameters =#
 
-test_params = [1., 10., 0.75,
--15., -5.,
-10., 10.,
--30., 10.,
-10., 5.,
+test_params = [0.1, 0.1, 0.95,
+-270., -10.,
+400., 100.,
+400., 20.,
+40., 10.,
 0.4,
-2.6, 0.2, 0.01, 0.01]
+2.194, 0.1, 0.125, 0.02]
 
 test_params = deepcopy(test_params)
 
@@ -52,7 +52,7 @@ plot_density(test_paths[2][:,1], "alphaT1", minimum(test_paths[2][:,1]), maximum
 plot_density(test_paths[2][:,2], "alphaT2", minimum(test_paths[2][:,2]), maximum(test_paths[2][:,2]))
 
 @elapsed test_choices = sim_choices(test_paths[1], test_paths[2], test_paths[3], test_paths[4],
-  paramsprefs, paramsdec, paramsshock, bellman_tol=1e-9, bellman_iter=5000, error_log_flag=1)
+  paramsprefs, paramsdec, paramsshock, bellman_tol=1e-9, bellman_iter=5000, error_log_flag=0)
 
 test_mom = moment_gen_dist(test_choices)
 

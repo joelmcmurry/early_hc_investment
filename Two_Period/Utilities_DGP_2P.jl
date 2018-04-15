@@ -55,16 +55,60 @@ end
 
 # draw state-specific types
 
+# function type_construct(y::Float64, a::Float64, b::Float64, paramsprefs::ParametersPrefs; seed=1234, type_N=2,
+#   alphaT1_lim_lb=0.00001, alphaT1_lim_ub=1000000., alphaT2_lim_lb=0.00001, alphaT2_lim_ub=1000000., mean_flag=0)
+#
+#   # for computational reasons, set factor by which we divide states
+#   y_div = 1000000000.
+#   a_div = 100000000.
+#   b_div= 10000.
+#
+#   # compute mean of joint distribution given type
+#   mu_state = paramsprefs.gamma_0 + paramsprefs.gamma_y*y/y_div + paramsprefs.gamma_a*a/a_div + paramsprefs.gamma_b*b/b_div
+#
+#   # draw N types or return mean draws only
+#   if mean_flag == 0
+#     srand(seed); type_vec = rand(MvNormal(mu_state, paramsprefs.Sigma), type_N)
+#   elseif mean_flag == 1
+#     type_vec = mu_state
+#   end
+#
+#   # compute density of each draw
+#   type_pdf = pdf(MvNormal(mu_state, paramsprefs.Sigma), type_vec)
+#
+#   # bound alphaT1 above 0
+#   type_vec[1,:] = exp.(type_vec[1,:])
+#
+#   # bound alphaT2 above 0
+#   type_vec[2,:] = exp.(type_vec[2,:])
+#
+#   # transform to probabilities
+#   type_prob = type_pdf./sum(type_pdf)
+#
+#   # trim outliers
+#   type_vec[1,:] = max.(type_vec[1,:], alphaT1_lim_lb)
+#   type_vec[2,:] = max.(type_vec[2,:], alphaT2_lim_lb)
+#
+#   # type_vec[1,:] = min.(type_vec[1,:], alphaT1_lim_ub)
+#   # type_vec[2,:] = min.(type_vec[2,:], alphaT2_lim_ub)
+#
+#   return type_vec, type_prob
+#
+# end
+
 function type_construct(y::Float64, a::Float64, b::Float64, paramsprefs::ParametersPrefs; seed=1234, type_N=2,
-  alphaT1_lim_lb=0.00001, alphaT1_lim_ub=1000000., alphaT2_lim_lb=0.00001, alphaT2_lim_ub=1000000., mean_flag=0)
+  K=10., A=-10., mean_flag=0)
 
   # for computational reasons, set factor by which we divide states
   y_div = 1000000.
   a_div = 100000.
-  b_div= 10.
+  b_div= 100.
 
-  # compute mean of joint distribution given type
-  mu_state = paramsprefs.gamma_0 + paramsprefs.gamma_y*y/y_div + paramsprefs.gamma_a*a/a_div + paramsprefs.gamma_b*b/b_div
+  # linear combination of states
+  lin_comb = paramsprefs.gamma_0 + paramsprefs.gamma_y*y/y_div + paramsprefs.gamma_a*a/a_div + paramsprefs.gamma_b*b/b_div
+
+  # generalize logistic transform to bound between K and A
+  mu_state = A + (1./(1.+exp.(-lin_comb)))*(K-A)
 
   # draw N types or return mean draws only
   if mean_flag == 0
@@ -84,13 +128,6 @@ function type_construct(y::Float64, a::Float64, b::Float64, paramsprefs::Paramet
 
   # transform to probabilities
   type_prob = type_pdf./sum(type_pdf)
-
-  # trim outliers
-  type_vec[1,:] = max.(type_vec[1,:], alphaT1_lim_lb)
-  type_vec[2,:] = max.(type_vec[2,:], alphaT2_lim_lb)
-
-  type_vec[1,:] = min.(type_vec[1,:], alphaT1_lim_ub)
-  type_vec[2,:] = min.(type_vec[2,:], alphaT2_lim_ub)
 
   return type_vec, type_prob
 
@@ -391,10 +428,10 @@ function moment_gen_dist(formatted_data; restrict_flag=1)
   b_moments = [mean(formatted_data[3][2]) var(formatted_data[3][2])^0.5]
   savings_moments = [mean(formatted_data[4][1]) var(formatted_data[4][1])^0.5]
   x_moments = [mean(formatted_data[5][1]) var(formatted_data[5][1])^0.5]
-  y_cov = [cor(formatted_data[1][1],formatted_data[4][1]) cor(formatted_data[1][1],formatted_data[5][1])]
-  a_cov = [cor(formatted_data[2][1],formatted_data[4][1]) cor(formatted_data[2][1],formatted_data[5][1])]
-  b_cov = [cor(formatted_data[3][1],formatted_data[4][1]) cor(formatted_data[3][1],formatted_data[5][1])]
-  cov_s_x = cor(formatted_data[4][1],formatted_data[5][1])
+  y_cov = [cor(formatted_data[1][1],formatted_data[2][2]) cor(formatted_data[1][1],formatted_data[5][1])]
+  a_cov = [cor(formatted_data[2][1],formatted_data[2][2]) cor(formatted_data[2][1],formatted_data[5][1])]
+  b_cov = [cor(formatted_data[3][1],formatted_data[2][2]) cor(formatted_data[3][1],formatted_data[5][1])]
+  cov_s_x = cor(formatted_data[2][2],formatted_data[5][1])
 
   # stack unconditional moments (means, std. devs, state/control covariances, control covariance)
   uncond_moment_stack = 0.
@@ -433,10 +470,10 @@ function moment_gen_dist(formatted_data; restrict_flag=1)
   x_cond_b = zeros(4)
 
   # compute moments conditional on quantiles of initial income
-  savings_cond_y[1] = mean(formatted_data[4][1][formatted_data[1][1].<y_quantiles[1],1])
-  savings_cond_y[2] = mean(formatted_data[4][1][(formatted_data[1][1].>=y_quantiles[1])&(formatted_data[1][1].<y_quantiles[2]),1])
-  savings_cond_y[3] = mean(formatted_data[4][1][(formatted_data[1][1].>=y_quantiles[2])&(formatted_data[1][1].<y_quantiles[3]),1])
-  savings_cond_y[4] = mean(formatted_data[4][1][(formatted_data[1][1].>=y_quantiles[3]),1])
+  savings_cond_y[1] = mean(formatted_data[2][2][formatted_data[1][1].<y_quantiles[1],1])
+  savings_cond_y[2] = mean(formatted_data[2][2][(formatted_data[1][1].>=y_quantiles[1])&(formatted_data[1][1].<y_quantiles[2]),1])
+  savings_cond_y[3] = mean(formatted_data[2][2][(formatted_data[1][1].>=y_quantiles[2])&(formatted_data[1][1].<y_quantiles[3]),1])
+  savings_cond_y[4] = mean(formatted_data[2][2][(formatted_data[1][1].>=y_quantiles[3]),1])
 
   x_cond_y[1] = mean(formatted_data[5][1][formatted_data[1][1].<y_quantiles[1],1])
   x_cond_y[2] = mean(formatted_data[5][1][(formatted_data[1][1].>=y_quantiles[1])&(formatted_data[1][1].<y_quantiles[2]),1])
@@ -444,10 +481,10 @@ function moment_gen_dist(formatted_data; restrict_flag=1)
   x_cond_y[4] = mean(formatted_data[5][1][(formatted_data[1][1].>=y_quantiles[3]),1])
 
   # compute moments conditional on quantiles of initial assets
-  savings_cond_a[1] = mean(formatted_data[4][1][formatted_data[2][1].<a_quantiles[1],1])
-  savings_cond_a[2] = mean(formatted_data[4][1][(formatted_data[2][1].>=a_quantiles[1])&(formatted_data[2][1].<a_quantiles[2]),1])
-  savings_cond_a[3] = mean(formatted_data[4][1][(formatted_data[2][1].>=a_quantiles[2])&(formatted_data[2][1].<a_quantiles[3]),1])
-  savings_cond_a[4] = mean(formatted_data[4][1][(formatted_data[2][1].>=a_quantiles[3]),1])
+  savings_cond_a[1] = mean(formatted_data[2][2][formatted_data[2][1].<a_quantiles[1],1])
+  savings_cond_a[2] = mean(formatted_data[2][2][(formatted_data[2][1].>=a_quantiles[1])&(formatted_data[2][1].<a_quantiles[2]),1])
+  savings_cond_a[3] = mean(formatted_data[2][2][(formatted_data[2][1].>=a_quantiles[2])&(formatted_data[2][1].<a_quantiles[3]),1])
+  savings_cond_a[4] = mean(formatted_data[2][2][(formatted_data[2][1].>=a_quantiles[3]),1])
 
   x_cond_a[1] = mean(formatted_data[5][1][formatted_data[2][1].<a_quantiles[1],1])
   x_cond_a[2] = mean(formatted_data[5][1][(formatted_data[2][1].>=a_quantiles[1])&(formatted_data[2][1].<a_quantiles[2]),1])
@@ -455,10 +492,10 @@ function moment_gen_dist(formatted_data; restrict_flag=1)
   x_cond_a[4] = mean(formatted_data[5][1][(formatted_data[2][1].>=a_quantiles[3]),1])
 
   # compute moments conditional on quantiles of initial HC
-  savings_cond_b[1] = mean(formatted_data[4][1][formatted_data[3][1].<b_quantiles[1],1])
-  savings_cond_b[2] = mean(formatted_data[4][1][(formatted_data[3][1].>=b_quantiles[1])&(formatted_data[3][1].<b_quantiles[2]),1])
-  savings_cond_b[3] = mean(formatted_data[4][1][(formatted_data[3][1].>=b_quantiles[2])&(formatted_data[3][1].<b_quantiles[3]),1])
-  savings_cond_b[4] = mean(formatted_data[4][1][(formatted_data[3][1].>=b_quantiles[3]),1])
+  savings_cond_b[1] = mean(formatted_data[2][2][formatted_data[3][1].<b_quantiles[1],1])
+  savings_cond_b[2] = mean(formatted_data[2][2][(formatted_data[3][1].>=b_quantiles[1])&(formatted_data[3][1].<b_quantiles[2]),1])
+  savings_cond_b[3] = mean(formatted_data[2][2][(formatted_data[3][1].>=b_quantiles[2])&(formatted_data[3][1].<b_quantiles[3]),1])
+  savings_cond_b[4] = mean(formatted_data[2][2][(formatted_data[3][1].>=b_quantiles[3]),1])
 
   x_cond_b[1] = mean(formatted_data[5][1][formatted_data[3][1].<b_quantiles[1],1])
   x_cond_b[2] = mean(formatted_data[5][1][(formatted_data[3][1].>=b_quantiles[1])&(formatted_data[3][1].<b_quantiles[2]),1])
@@ -497,12 +534,12 @@ function moment_gen_dist(formatted_data; restrict_flag=1)
   # list of moments
   moments_desc = ["Mean a2", "Mean b2", "Mean savings", "Mean x",
     "Stddev a2", "Stddev b", "Stddev savings", "Stddev x",
-    "Cor[s,x]",
-    "Cor[savings,y]", "Cor[savings,a]", "Cor[savings,b]",
+    "Cor[a2,x]",
+    "Cor[a2,y]", "Cor[a2,a]", "Cor[a2,b]",
     "Cor[x,y]", "Cor[x,a]", "Cor[x,b]",
-    "E[savings|1st quant. y]","E[savings|2nd quant. y]","E[savings|3rd quant. y]","E[savings|4th quant. y]",
-    "E[savings|1st quant. a]","E[savings|2nd quant. a]","E[savings|3rd quant. a]","E[savings|4th quant. a]",
-    "E[savings|1st quant. b]","E[savings|2nd quant. b]","E[savings|3rd quant. b]","E[savings|4th quant. b]",
+    "E[a2|1st quant. y]","E[a2|2nd quant. y]","E[a2|3rd quant. y]","E[a2|4th quant. y]",
+    "E[a2|1st quant. a]","E[a2|2nd quant. a]","E[a2|3rd quant. a]","E[a2|4th quant. a]",
+    "E[a2|1st quant. b]","E[a2|2nd quant. b]","E[a2|3rd quant. b]","E[a2|4th quant. b]",
     "E[x|1st quant. y]","E[x|2nd quant. y]","E[x|3rd quant. y]","E[x|4th quant. y]",
     "E[x|1st quant. a]","E[x|2nd quant. a]","E[x|3rd quant. a]","E[x|4th quant. a]",
     "E[x|1st quant. b]","E[x|2nd quant. b]","E[x|3rd quant. b]","E[x|4th quant. b]"]
