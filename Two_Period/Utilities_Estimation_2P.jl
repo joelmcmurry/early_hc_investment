@@ -2,7 +2,8 @@
 
 using DataFrames
 using Sobol
-using LatexPrint
+# using LatexPrint
+using Latexify
 using PyPlot
 
 println("estimation utilities loading")
@@ -247,11 +248,11 @@ function print_param_mom(data_formatted, paramsprefs::ParametersPrefs, paramsdec
    table_mom_out = tabular(table_mom)
 
    # graph conditional averages
-   plot_cond_mom(data_moments, sim_moments, 14, "Income Quartile", "Avg. a2 Cond. on Income", "Terminal Assets", "Income", "a2_cond_y_fig",
+   plot_cond_mom(data_moments, sim_moments, 14, "Income Quartile", "Avg. \$a_T\$ Cond. on Income", "Terminal Assets", "Income", "a2_cond_y_fig",
       print_flag)
-   plot_cond_mom(data_moments, sim_moments, 18, "Initial Asset Quartile", "Avg. a2 Cond. on Income", "Terminal Assets", "Initial Asset", "a2_cond_a_fig",
+   plot_cond_mom(data_moments, sim_moments, 18, "Initial Asset Quartile", "Avg. \$a_T\$ Cond. on Income", "Terminal Assets", "Initial Asset", "a2_cond_a_fig",
       print_flag)
-   plot_cond_mom(data_moments, sim_moments, 22, "Initial HC Quartile", "Avg. a2 Cond. on Income", "Terminal Assets", "Initial HC", "a2_cond_b_fig",
+   plot_cond_mom(data_moments, sim_moments, 22, "Initial HC Quartile", "Avg. \$a_T\$ Cond. on Income", "Terminal Assets", "Initial HC", "a2_cond_b_fig",
       print_flag)
 
    plot_cond_mom(data_moments, sim_moments, 26, "Income Quartile", "Avg. x Cond. on Income", "Investment", "Income", "x_cond_y_fig",

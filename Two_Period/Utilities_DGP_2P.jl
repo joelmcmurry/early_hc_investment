@@ -563,3 +563,35 @@ function moment_gen_dist(formatted_data; restrict_flag=1)
   return moments_out, moments_desc
 
 end
+
+# y_test=linspace(25000.,250000.,1000.)
+#
+# alphaT1_test = zeros(length(y_test))
+#
+# for i in 1:length(y_test)
+#   alphaT1_test[i] = type_construct(y_test[i],
+#     initial_states_comp[1,2], initial_states_comp[1,3], paramsprefs, seed=1234, type_N=2, K=10., A=-10., mean_flag=1)[1][1]
+# end
+#
+# test_fig = figure()
+# plot(y_test, alphaT1_test)
+#
+#
+# y_div = 1000000.
+# a_div = 100000.
+# b_div= 100.
+#
+# lin_comb_test = zeros(length(y_test))
+# exp_test = zeros(length(y_test))
+#
+# for n in 1:length(y_test)
+#   lin_comb_test[n] = paramsprefs.gamma_0[1] + paramsprefs.gamma_y[1]*y_test[n]/y_div +
+#     paramsprefs.gamma_a[1]*initial_states_comp[1,2]/a_div + paramsprefs.gamma_b[1]*initial_states_comp[1,3]/b_div
+#   exp_test[n] = exp(lin_comb_test[n])
+# end
+#
+# test_fig1 = figure()
+# plot(y_test, lin_comb_test)
+#
+# test_fig2 = figure()
+# plot(y_test, exp_test)
