@@ -113,7 +113,7 @@ function type_construct(y::Float64, a::Float64, b::Float64, paramsprefs::Paramet
   mu_state[2] = A + (1./(1.+exp(-lin_comb[2])))*(K-A)
 
   # draw N types or return mean draws only
-  if mean_flag == 0
+  if mean_flag == 0 || type_N == 1
     srand(seed); type_vec = rand(MvNormal(mu_state, paramsprefs.Sigma), type_N)
   elseif mean_flag == 1
     type_vec = mu_state

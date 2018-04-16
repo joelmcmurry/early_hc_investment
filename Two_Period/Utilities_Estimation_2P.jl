@@ -2,8 +2,8 @@
 
 using DataFrames
 using Sobol
-# using LatexPrint
-using Latexify
+using LatexPrint
+# using Latexify
 using PyPlot
 
 println("estimation utilities loading")
